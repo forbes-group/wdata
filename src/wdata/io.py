@@ -247,20 +247,20 @@ class IWData(Interface):
 
             Returns the data of the named variable or the named
             constant, following aliases if defined."""
-            
+
 
 @implementer(IVar)
 class Var(object):
     def __init__(self,
                  name=None, data=None, description=None,
-                 filename=None,                 
+                 filename=None,
                  ext=None, unit="none",
                  descr=None,
                  shape=None,
                  **kwargs):
         if name is None:
             if data is not None:
-                raise ValueError("Got data but no name.")                
+                raise ValueError("Got data but no name.")
             if not len(kwargs) == 1:
                 raise ValueError(
                     f"Must provide `name` or data as a kwarg: got {kwargs}")
@@ -327,8 +327,8 @@ class Var(object):
         if (self._data is not None
                 and shape is not None
                 and shape != self._data.shape):
-            raise ValueError(f"Property shape={shape} incompatible " +
-                             f"with data.shape={data.shape}")
+            raise ValueError(f"Property shape={shape} incompatible "
+                             + f"with data.shape={self._data.shape}")
         self._shape = shape
         
     def write_data(self, filename=None, force=False, ext="wdat"):
@@ -474,13 +474,18 @@ class WData(object):
                     name, data = var.name, var.data
                     if Nt != var.data.shape[0]:
                         raise ValueError(
-                            f"Variable '{name}'has incompatible Nt={Nt}: " + 
-                            f"shape[0] = {data.shape[0]}")
+                            f"Variable '{name}'has incompatible Nt={Nt}:"
+                            + f" shape[0] = {data.shape[0]}")
                     if var.data.shape[-self.dim:] != self.Nxyz:
                         raise ValueError(
-                            f"Variable '{name}' has incompatible Nxyz={Nxyz}: " + 
-                            f"shape[-{self.dim}:] = {data.shape[-self.dim:]}")
-
+                            f"Variable '{name}' has incompatible Nxyz={Nxyz}:"
+                            + f" shape[-{self.dim}:] = {data.shape[-self.dim:]}")
+                    if ((var.vector and len(var.shape)-2 != dim)
+                            or (not var.vector and len(var.shape)-1 != dim)):
+                        raise ValueError(
+                            f"Variable '{name}' has incompatible dim={dim}:"
+                            + f" data.shape = {data.shape}")
+                        
     @property
     def dim(self):
         return len(self.xyz)
@@ -505,7 +510,7 @@ class WData(object):
             ('cycles', self.Nt, "Number Nt of frames/cycles per dataset"),
             ('t0', self.t0, "Time value of first frame"),
             ('dt', self.dt if self.dt is not None else 'varying',
-                            "Time interval between frames")]
+             "Time interval between frames")]
 
         # Add X0, Y0, Z0 if not default
         for x0, dx, Nx, X in zip(self.xyz0, self.dxyz, self.Nxyz, 'XYZ'):
@@ -603,8 +608,8 @@ class WData(object):
             if full_prefix is None:
                 return cls.load_from_infofile(infofile=infofile)
             raise ValueError(
-                f"Got both infofile={infofile} and " +
-                f"full_prefix={full_prefix}.")
+                f"Got both infofile={infofile} and"
+                + f" full_prefix={full_prefix}.")
         elif full_prefix is None:
             raise ValueError(
                 "Must provide either infofile or full_prefix.")
@@ -644,7 +649,7 @@ class WData(object):
         # Pairs of ([terms], [comment]) or ([terms], []) if no comment
         lines = [([_w.strip() for _w in _l[0].split()], _l[1:])
                  for _l in lines if _l]
-        lines = [_l for _l in lines if _l[0]] # Skip blank lines
+        lines = [_l for _l in lines if _l[0]]  # Skip blank lines
 
         parameters = OrderedDict()
         variables = []
@@ -722,7 +727,6 @@ class WData(object):
 
     def load_data(self, *names):
         """Load the specified data."""
-        full_prefix = os.path.join(data_dir, prefix)
         raise NotImplementedError
         
     def __getattr__(self, key):
@@ -781,7 +785,8 @@ class WData(object):
 def load_wdata(prefix=None, infofile=None):
     if infofile is not None:
         return WData.load(infofile=infofile)
-    
+
+
 ######################################################################
 # Utilities and helpers
 def current_time(format="%Y-%m-%d %H:%M:%S %Z%z"):
