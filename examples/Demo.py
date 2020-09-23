@@ -13,10 +13,6 @@
 #     name: conda-env-work-py
 # ---
 
-import zope.interface.verify
-dir(zope.interface.verify)
-
-
 # +
 from importlib import reload
 import numpy as np
@@ -71,27 +67,6 @@ res = wdata.io.WData(
 print(res.get_metadata())
 # -
 
-res.file_format = 'wdat'
-res.save(force=True)
-res
-# !ls
-# !cat tmp.wtxt
-
-wdata.io.WData.load('tmp.wtxt')
-
-"""1
-2""".splitlines()
-
-from dataclasses import dataclass
-@dataclass
-class A:
-    __slots__ = ['x', 'y']
-    def __init__(self, x=3, y=4):
-        self.x=x
-        self.y=y
-a = A(x=3, y=4)
-a.x = 3
-a.y = 4
-a.z = 3
-
-
+data = wdata.io.WData.load('tmp.wtxt')
+print(data.description)
+data.density.shape
