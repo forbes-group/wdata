@@ -18,6 +18,7 @@ npy:
      components each.  Note: we assume Nx > 3 so that these two cases
      can be distinguished by looking at shape[1].
 """
+import collections.abc
 from collections import OrderedDict
 import os.path
 from warnings import warn
@@ -29,6 +30,7 @@ from pytz import timezone
 import tzlocal
 
 from zope.interface import implementer, Attribute, Interface
+from zope.interface.common.collections import IMapping
 
 
 class IVar(Interface):
@@ -101,7 +103,7 @@ class IVar(Interface):
         """
 
 
-class IWData(Interface):
+class IWData(IMapping):
     """Interface of a complete dataset.
 
     Also used to define abscissa as follows:
@@ -135,6 +137,8 @@ class IWData(Interface):
     t0 = Attribute("Time of initial frame.")
     dt = Attribute("Time steps between frames.  None if not uniform.")
 
+    infofile = Attribute("Name of infofile")
+    
     def __init__(prefix='tmp',
                  description="",
                  data_dir='.',
@@ -242,11 +246,11 @@ class IWData(Interface):
         a prefix determined by the filenames if the files above exist.
         """
 
-        def __getattr__(key):
-            """Convenience method for variable access.
-
-            Returns the data of the named variable or the named
-            constant, following aliases if defined."""
+    def __getattr__(key):
+        """Convenience method for variable access.
+        
+        Returns the data of the named variable or the named
+        constant, following aliases if defined."""
 
 
 @implementer(IVar)
@@ -374,7 +378,7 @@ class Var(object):
 
 
 @implementer(IWData)
-class WData(object):
+class WData(collections.abc.Mapping):
     """Base implementation."""
 
     # This is the extension used for infofiles
@@ -564,6 +568,12 @@ class WData(object):
                    for _k in self.constants]))
         return "\n".join(lines)
 
+    @property
+    def infofile(self):
+        return os.path.join(self.data_dir,
+                            ".".join([self.prefix,
+                                      self._infofile_extension]))
+        
     def save(self, force=False):
         t1, t2 = current_time()
         metadata = self.get_metadata(
@@ -576,9 +586,7 @@ class WData(object):
             else:
                 raise IOError(f"Directory data_dir={data_dir} does not exist.")
 
-        infofile = os.path.join(data_dir,
-                                ".".join([self.prefix,
-                                          self._infofile_extension]))
+        infofile = self.infofile
         if os.path.exists(infofile) and not force:
             raise IOError(f"File {infofile} already exists!")
 
@@ -728,19 +736,43 @@ class WData(object):
     def load_data(self, *names):
         """Load the specified data."""
         raise NotImplementedError
-        
+
     def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            return super().__getattribute__(key)
+    
+    ######################################################################
+    # Methods for the IMapping interface.  Used by collections.abc.Mapping
+    def __getitem__(self, key):
         key = self.aliases.get(key, key)
         for var in self.variables:
             if var.name == key:
                 if key in self.constants:
                     warn(f"Variable {key} hides constant of the same name")
                 return var.data
+        
         if key in self.constants:
             return self.constants[key]
 
-        return super().__getattribute__(key)
+        raise KeyError(key)
 
+    def keys(self):
+        keys = set([_var.name for _var in self.variables])
+        if self.aliases:
+            keys.update(self.aliases)
+        if self.constants:
+            keys.update(self.constants)
+        return sorted(keys)
+
+    def __iter__(self):
+        return self.keys()
+    
+    def __len__(self):
+        return len(self.keys())
+        
+    ######################################################################
     ####################
     # Helpers
     @staticmethod
