@@ -6,6 +6,42 @@ This is a basic implementation of two classes: `wdata.io.Var` and
 `wdata.io.IWdata` respectively.  These provide a python interface to
 the W-DATA format.
 
+Thu Dec 17 2020
+---------------
+* Updated project to use [`poetry`] and [`nox`] for testing.  [Install
+  poetry as](https://python-poetry.org/docs/#installation):
+  
+  ```bash
+  curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
+  ```
+
+  Useful commands include:
+  
+  ```bash
+  poetry run nox         # Run all tests
+  poetry add [-D] <dep>  # Add [dev] dependence to pyproject.toml
+  poetry remove <dep>    # Remove dependence to pyproject.toml
+  poetry run nox         # Run all tests: requires python3.x installed
+  ```
+  
+  To test against different versions of python, you will need to have
+  those installed externally with either `pyenv`, `conda`, etc.  I did
+  this:
+  
+  ```bash
+  BINDIR=~/.local/bin/
+  mkdir -p "${BINDIR}"
+  for v in 3.6 3.7 3.8 3.9; do
+    conda create -y -n py${v} python=${v}
+    ln -fs $(conda run -n py${v} type -p python${v}) "${BINDIR}/"
+  done
+  conda clean -y --all    # Removes all downloaded files for conda.
+  ```
+  
+
+[`poetry`]: https://python-poetry.org/
+[`nox`]: https://nox.thea.codes/
+
 Wed 23 Sept 2020
 ----------------
 * Basic implementation complete with some tests.
