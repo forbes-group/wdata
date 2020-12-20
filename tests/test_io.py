@@ -251,14 +251,14 @@ var        density       real      none        wdat
         assert np.allclose(wdata.t, ts)
         assert np.allclose(wdata.t0, 0)
         assert np.allclose(wdata.dt, 1)
+        density_, = wdata.variables
 
-        density, = wdata.variables
-        assert density_a.name == 'density'
-        assert density_a.description == ''
-        assert density_a.ext == 'wdat'
-        assert density_a.unit == 'none'
-        assert density_a.filename == f'{full_prefix}_density_a.wdat'
-        assert density_a.descr == '<f8'
-        assert not density_a.vector
-        assert np.allclose(density_a.data, density)
+        assert density_.name == 'density'
+        assert density_.description == ''
+        assert density_.ext == 'wdat'
+        assert density_.unit == 'none'
+        assert density_.filename == f'{full_prefix}_density.wdat'
+        assert density_.descr == '<f8'
+        assert not density_.vector
+        assert np.allclose(density_.data, density)
         

@@ -704,6 +704,9 @@ class WData(collections.abc.Mapping):
         prefix = parameters['prefix']
         
         Nxyz = tuple(int(parameters.pop(f'N{X}', 1)) for X in 'XYZ')
+        dim = int(parameters.pop('datadim', len(Nxyz)))
+        Nxyz = Nxyz[:dim]
+        
         Nt = int(parameters.pop('cycles', 0))
         
         # Add filenames and shapes.  Defer loading until the user needs the data
@@ -720,8 +723,8 @@ class WData(collections.abc.Mapping):
             description=description,
             data_dir=data_dir,
             Nxyz=Nxyz,
-            dxyz=tuple(float(parameters.pop(f'D{X}', 1.0)) for X in 'XYZ'),
-            xyz0=tuple(float(parameters.pop(f'{X}0', np.nan)) for X in 'XYZ'),
+            dxyz=tuple(float(parameters.pop(f'D{X}', 1.0)) for X in 'XYZ')[:dim],
+            xyz0=tuple(float(parameters.pop(f'{X}0', np.nan)) for X in 'XYZ')[:dim],
             Nt=Nt,
             t0=float(parameters.pop('t0', 0)),
             dt=float(parameters.pop('dt', 1)),
