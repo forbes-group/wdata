@@ -15,7 +15,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
-numpy = "1.16 || ^1.19.4"
+numpy = "^1.19.4"
 tzlocal = "^2.1"
 pytz = "^2020.4"
 "zope.interface" = "^5.2.0"
