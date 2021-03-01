@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wdata"
-version = "0.1.1"
+version = "0.1.2"
 description = "W-Data format for superfluid dynamics and the W-SLDA Toolkit."
 authors = ["Michael McNeil Forbes <mforbes@alum.mit.edu>"]
 license = "MIT"
@@ -25,6 +25,11 @@ nox = "^2020.8.22"
 pytest = "^6.2.1"
 pytest-cov = "^2.10.1"
 nox-poetry = "^0.6.0"
+
+Sphinx = "^3.3.1"
+sphinxcontrib-zopeext = "^0.2.4"
+sphinx-autobuild = "^2020.9.1"
+sphinx-rtd-theme = "^0.5.0"
 
 [tool.poetry.urls]
 "Bug Reports" = "https://hg.iscimath.org/forbes-group/wdata/issues"
