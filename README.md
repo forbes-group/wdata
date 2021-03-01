@@ -257,7 +257,6 @@ nox
 
 Documentation
 -------------
-
 For documentation, we use [Sphinx](https://www.sphinx-doc.org).  To build this run:
 
 ```bash
