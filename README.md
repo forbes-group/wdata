@@ -209,4 +209,8 @@ p.show()
 Developer Notes
 ===============
 For distribution we use [poetry](https://python-poetry.org) and for testing we use
-[nox](https://nox.thea.codes).
+[nox](https://nox.thea.codes).  To test the code:
+
+```bash
+nox
+```
