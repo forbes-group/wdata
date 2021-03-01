@@ -205,3 +205,12 @@ p = pv.Plotter()
 p.add_mesh(contours, scalars=contours.points[:, 2])
 p.show()
 ```
+
+Developer Notes
+===============
+For distribution we use [poetry](https://python-poetry.org) and for testing we use
+[nox](https://nox.thea.codes).  To test the code:
+
+```bash
+nox
+```
