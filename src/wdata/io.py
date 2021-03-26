@@ -17,6 +17,17 @@ npy:
    * `(Nt, Nv) + Nxyz`: Vector data with `Nt` blocks, and Nv <= 3
      components each.  Note: we assume Nx > 3 so that these two cases
      can be distinguished by looking at shape[1].
+
+Note: Both of these formats are simple binary representations, and hence can be loaded
+as memory mapped files.  We do this by default in the current code so users can extract
+slices as needed without loading the entire dataset.  Be aware that the data can be big,
+so if you do anything that makes a copy of the array (like computing `np.sin(...)`),
+this will load the entire array into memory.
+
+See Also
+--------
+* https://numpy.org/doc/stable/reference/generated/numpy.memmap.html
+
 """
 import collections.abc
 from collections import OrderedDict
@@ -224,7 +235,7 @@ class IWData(IMapping):
         """
 
     def load(infofile=None, full_prefix=None):
-        """Load data.
+        """Load data from disk.
 
         Arguments
         ---------
@@ -388,9 +399,9 @@ class Var(object):
     def load_data(self):
         """Load the data from file."""
         if self.ext == "npy":
-            self._data = np.io.load(self.filename)
+            self._data = np.load(self.filename, mmap_mode="r")
         elif self.ext == "wdat":
-            self._data = np.fromfile(self.filename, dtype=np.dtype(self.descr)).reshape(
+            self._data = np.memmap(self.filename, dtype=np.dtype(self.descr)).reshape(
                 self.shape
             )
         else:
