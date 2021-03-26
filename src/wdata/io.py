@@ -4,19 +4,30 @@ Binary data is stored in one of the following formats denoted by their
 extension:
 
 wdata:
-   Filename ends in '.wdat'.  This is a simple binary format
+   Filename ends in ``.wdat``.  This is a simple binary format
    contiguous in C ordering.  In this format there is no information
    about the size, datatype, or shape of the data.  Thus, a
    corresponding metadata file is needed.
 npy:
-   Filename ends in '.wdat'  This is the NPY format.  This includes
+   Filename ends in ``.wdat``  This is the NPY format.  This includes
    the size and datatype, so one can infer the type of data without a
    metadata file.  We assume that the shape is one of:
 
-   * `(Nt,) + Nxyz`: Scalar data with `Nt` blocks each of shape `Nxyz`.
-   * `(Nt, Nv) + Nxyz`: Vector data with `Nt` blocks, and Nv <= 3
-     components each.  Note: we assume Nx > 3 so that these two cases
-     can be distinguished by looking at shape[1].
+   * ``(Nt,) + Nxyz``: Scalar data with `Nt` blocks each of shape ``Nxyz``.
+   * ``(Nt, Nv) + Nxyz``: Vector data with ``Nt`` blocks, and ``Nv <= 3``
+     components each.  Note: we assume ``Nx > 3`` so that these two cases
+     can be distinguished by looking at ``shape[1]``.
+
+Note: Both of these formats are simple binary representations, and hence can be loaded
+as memory mapped files.  We do this by default in the current code so users can extract
+slices as needed without loading the entire dataset.  Be aware that the data can be big,
+so if you do anything that makes a copy of the array (like computing `np.sin(...)`),
+this will load the entire array into memory.
+
+See Also
+--------
+* https://numpy.org/doc/stable/reference/generated/numpy.memmap.html
+
 """
 import collections.abc
 from collections import OrderedDict
@@ -41,11 +52,11 @@ class IVar(Interface):
 
     If data is provided, then it must have the shape:
 
-    Abscissa data: (N,)
-    Scalar data: (Nt,) + Nxyz
-    Vector data: (Nt, 3) + Nxyz
+    * Abscissa data: ``(N,)``
+    * Scalar data: ``(Nt,) + Nxyz``
+    * Vector data: ``(Nt, 3) + Nxyz``
 
-    Assumes that Nx > 3 so that if shape[1] <= 3, the data is vector.
+    Assumes that ``Nx > 3`` so that if ``shape[1] <= 3``, the data is vector.
     """
 
     # Required attributes
@@ -77,7 +88,7 @@ class IVar(Interface):
         ---------
         name : str
            Name of the variable.  If not provided, then the data
-           should be set using kwarg syntax __init__(name=data).
+           should be set using kwarg syntax ``__init__(name=data)``.
         kwargs : {name: data}
            If no name is provided, then kwargs should have a single
            entry which is the data and the key is the name.
@@ -105,21 +116,21 @@ class IVar(Interface):
            If True, overwrite existing files, otherwise raise IOError
            if file exists.
         ext : str
-           File format.  Currently supported values are 'wdat' (pure
-           binary) and 'npy' for the numpy NPY format.
+           File format.  Currently supported values are ``'wdat'`` (pure
+           binary) and ``'npy'`` for the numpy NPY format.
         """
 
 
 class IWData(IMapping):
     """Interface of a complete dataset.
 
-    Also used to define abscissa as follows:
+    Also used to define abscissa as follows::
 
-    x = np.arange(Nx)*dx + x0
-    t = np.arange(Nt)*dt + t0
+        x = np.arange(Nx)*dx + x0
+        t = np.arange(Nt)*dt + t0
 
-    If not provided, the default values are `x0 = -Lx/2 = -Nx*dx/2` so
-    that the spatial abscissa are centered on the orgin and `t0 = 0`.
+    If not provided, the default values are ``x0 = -Lx/2 = -Nx*dx/2`` so
+    that the spatial abscissa are centered on the orgin and ``t0 = 0``.
     """
 
     prefix = Attribute("Prefix for all data files")
@@ -169,7 +180,7 @@ class IWData(IMapping):
         Arguments
         ---------
         prefix : str
-           Prefix for files.  Default is 'tmp' allowing this class to
+           Prefix for files.  Default is ``'tmp'`` allowing this class to
            be used to generate abscissa.
         description : str
            User-friendly description of the data.  Will be inserted as
@@ -181,20 +192,17 @@ class IWData(IMapping):
            not specify something else.  Also used for abscissa.
 
         Nxyz : (int,)*dim
-        dxyz : (float,)*dim
-        xyz0 : (float,)*dim or None
-           If these are provided, then the abscissa xyz are computed
-           with equal spacings `x = np.arange(Nx)*dx + x0`.  Default
-           offeset (if `xyz0 == None`) is centered `x0 = -Lx/2 = -Nx*dx/2`.
+
+        Nxyz, dxyz, xyz0 : (int,)*dim, (float,)*dim, (float,)*dim or None
+           If these are provided, then the abscissa ``xyz`` are computed
+           with equal spacings ``x = np.arange(Nx)*dx + x0``.  Default
+           offeset (if ``xyz0 == None``) is centered ``x0 = -Lx/2 = -Nx*dx/2``.
         xyz : (array_like,)*dim
            Alternatively, the abscissa can be provided and the
            previous properties will be computed (if defined).
-
-        Nt : int
-        t0 : float
-        dt : float
+        Nt, t0, dt : int, float, float
            If these are provided, then the times are equally spaced.
-           `t = np.arange(Nt)*dt + t0`.
+           ``t = np.arange(Nt)*dt + t0``.
         t : array_like
            Alternatively, the times can be provided and the previous
            properties will be computed.
@@ -206,8 +214,8 @@ class IWData(IMapping):
     def get_metadata(header=None):
         """Return a string representation of the metadata file.
 
-        Argument
-        --------
+        Arguments
+        ---------
         header : str
            Descriptive header to be added as a comment at the top of
            the metadata file before self.description.
@@ -224,7 +232,7 @@ class IWData(IMapping):
         """
 
     def load(infofile=None, full_prefix=None):
-        """Load data.
+        """Load data from disk.
 
         Arguments
         ---------
@@ -233,17 +241,18 @@ class IWData(IMapping):
            contained within it to load the data.
         full_prefix : str
            Full prefix for data files, including directory if not in
-           the current directory.  I.e. `prefix='data_dir/run1'` will
-           look for data in the form of 'data_dir/run1_*.*' and an
-           infofile of the form 'data_dir/run1.wtxt'.
+           the current directory.  I.e. ``prefix='data_dir/run1'`` will
+           look for data in the form of ``'data_dir/run1_*.*'`` and an
+           infofile of the form ``'data_dir/run1.wtxt'``.
 
            The full_prefix will be split at the final path
-           separation and what follows will be the `prefix`.
+           separation and what follows will be the ``prefix``.
 
-        No infofile option
-        ------------------
+
+        **No infofile option**
+
         Data can be provided without metadata if the following files
-        are present:
+        are present::
 
            <full_prefix>_x.npy
            <full_prefix>_y.npy
@@ -256,7 +265,7 @@ class IWData(IMapping):
         variables.  No constants or links will be defined in this
         case.
 
-        One other option is provided when `full_prefix` is a
+        One other option is provided when ``full_prefix`` is a
         directory: i.e. ends with a path separator.  In this case, the
         directory will be assumed to contain a single set of data with
         a prefix determined by the filenames if the files above exist.
@@ -388,9 +397,9 @@ class Var(object):
     def load_data(self):
         """Load the data from file."""
         if self.ext == "npy":
-            self._data = np.io.load(self.filename)
+            self._data = np.load(self.filename, mmap_mode="r")
         elif self.ext == "wdat":
-            self._data = np.fromfile(self.filename, dtype=np.dtype(self.descr)).reshape(
+            self._data = np.memmap(self.filename, dtype=np.dtype(self.descr)).reshape(
                 self.shape
             )
         else:
