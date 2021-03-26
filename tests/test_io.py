@@ -16,6 +16,11 @@ def data_dir():
         yield data_dir
 
 
+@pytest.fixture(params=["wdat", "npy"])
+def ext(request):
+    yield request.param
+
+
 class TestIO:
     def test_interfaces(self, data_dir):
         assert verifyClass(io.IVar, io.Var)
@@ -38,13 +43,15 @@ class TestIO:
         assert verifyObject(io.IVar, var)
         assert verifyObject(io.IWData, data)
 
-    def test_wdata1(self, data_dir):
+    def test_wdata1(self, data_dir, ext):
         Nxyz = (4, 8, 16)
         dxyz = (0.1, 0.2, 0.3)
         prefix = "tmp"
         full_prefix = os.path.join(data_dir, prefix)
 
-        data = io.WData(prefix=prefix, data_dir=data_dir, Nxyz=Nxyz, dxyz=dxyz, Nt=1)
+        data = io.WData(
+            prefix=prefix, data_dir=data_dir, Nxyz=Nxyz, dxyz=dxyz, Nt=1, ext=ext
+        )
 
         xyz = data.xyz
 
@@ -61,6 +68,7 @@ class TestIO:
             data_dir=data_dir,
             xyz=xyz,
             variables=[io.Var(density=densities), io.Var(delta=psis)],
+            ext=ext,
         )
         data.save()
 
