@@ -149,12 +149,12 @@ class IWData(IMapping):
     Nxyz = Attribute("Shape of data (Nx, Ny, Nz) and lattice shape.")
     xyz0 = Attribute("Offsets (x0, y0, z0).")
 
-    dxyz = Attribute("Spacing (dx, dy, dz).  `NotImplemented` if not uniform.")
+    dxyz = Attribute("Spacing (dx, dy, dz).  ``np.nan`` if not uniform.")
 
     t = Attribute("Times for each frame")
 
     t0 = Attribute("Time of initial frame.")
-    dt = Attribute("Time steps between frames.  None if not uniform.")
+    dt = Attribute("Time steps between frames.  ``np.nan`` if not uniform.")
 
     infofile = Attribute("Name of infofile")
 
@@ -413,6 +413,10 @@ class WData(collections.abc.Mapping):
     # This is the extension used for infofiles
     _infofile_extension = "wtxt"
 
+    # Allowed values for dx, dt, etc. for variable dimensions.  We use np.nan
+    # internally.
+    _varying = set([np.nan, None, NotImplemented, "varying"])
+
     def __init__(
         self,
         prefix="tmp",
@@ -453,9 +457,10 @@ class WData(collections.abc.Mapping):
             Nxyz, dxyz, xyz0 = [], [], []
             for x in xyz:
                 dxs = np.diff(x)
-                dx = dxs.mean()
-                if not np.allclose(dxs, dx):
-                    dx = NotImplemented
+                if len(dxs) > 0:
+                    dx = dxs.mean()
+                if len(dxs) == 0 or not np.allclose(dxs, dx):
+                    dx = np.nan
 
                 Nxyz.append(len(x))
                 dxyz.append(dx)
@@ -486,9 +491,10 @@ class WData(collections.abc.Mapping):
             t = np.ravel(self.t)
             Nt = len(t)
             dts = np.diff(t)
-            dt = dts.mean()
-            if not np.allclose(dts, dt):
-                dt = NotImplemented
+            if len(dts) > 0:
+                dt = dts.mean()
+            if len(dts) == 0 or not np.allclose(dts, dt):
+                dt = np.nan
             t0 = t[0]
         else:
             Nt, dt, t0 = self.Nt, self.dt, self.t0
@@ -538,9 +544,11 @@ class WData(collections.abc.Mapping):
         # Pad these with 1's for backwards compatibility with
         # Gabriel's existing code
         Nxyz = self.Nxyz + (1,) * (3 - len(self.Nxyz))
-        dxyz = self.dxyz + (1,) * (3 - len(self.dxyz))
-        if "None" in dxyz:
-            dxyz = tuple(_dx if _dx is not None else "varying" for _dx in dxyz)
+        dxyz = tuple(
+            _dx if _dx not in self._varying else "varying"
+            for _dx in self.dxyz + (1,) * (3 - len(self.dxyz))
+        )
+        dt = self.dt if self.dt not in self._varying else "varying"
 
         descriptors = [
             ("NX", Nxyz[0], "Lattice size in X direction"),
@@ -553,16 +561,12 @@ class WData(collections.abc.Mapping):
             ("datadim", self.dim, "Block size: 1:NX, 2:NX*NY, 3:NX*NY*NZ"),
             ("cycles", self.Nt, "Number Nt of frames/cycles per dataset"),
             ("t0", self.t0, "Time value of first frame"),
-            (
-                "dt",
-                self.dt if self.dt is not None else "varying",
-                "Time interval between frames",
-            ),
+            ("dt", dt, "Time interval between frames"),
         ]
 
         # Add X0, Y0, Z0 if not default
         for x0, dx, Nx, X in zip(self.xyz0, self.dxyz, self.Nxyz, "XYZ"):
-            if dx is not None and np.allclose(x0, -Nx * dx / 2):
+            if dx not in self._varying and np.allclose(x0, -Nx * dx / 2):
                 continue
             descriptors.append((f"{X}0", x0, f"First point in {X} lattice"))
 
@@ -627,7 +631,8 @@ class WData(collections.abc.Mapping):
                     + [("const", _k, repr(self.constants[_k])) for _k in self.constants]
                 )
             )
-        return "\n".join(lines)
+        metadata = "\n".join([_l.rstrip() for _l in "\n".join(lines).splitlines()])
+        return metadata
 
     @property
     def infofile(self):
@@ -653,18 +658,19 @@ class WData(collections.abc.Mapping):
         with open(infofile, "w") as f:
             f.write(metadata)
 
-        variables = list(self.variables)
+        if self.variables:
+            variables = list(self.variables)
 
-        if self.xyz is not None:
-            for _x, _n in zip(self.xyz, "xyz"):
-                variables.append(Var(**{_n: np.ravel(_x)}))
+            if self.xyz is not None:
+                for _x, _n in zip(self.xyz, "xyz"):
+                    variables.append(Var(**{_n: np.ravel(_x)}))
 
-        if self.t is not None:
-            variables.append(Var(t=np.ravel(self.t)))
+            if self.t is not None:
+                variables.append(Var(t=np.ravel(self.t)))
 
-        for var in self.variables:
-            filename = os.path.join(data_dir, "{}_{}".format(self.prefix, var.name))
-            var.write_data(filename=filename, force=force, ext=self.ext)
+            for var in self.variables:
+                filename = os.path.join(data_dir, "{}_{}".format(self.prefix, var.name))
+                var.write_data(filename=filename, force=force, ext=self.ext)
 
     @classmethod
     def load(cls, infofile=None, full_prefix=None):
@@ -782,11 +788,13 @@ class WData(collections.abc.Mapping):
             description=description,
             data_dir=data_dir,
             Nxyz=Nxyz,
-            dxyz=tuple(float(parameters.pop(f"D{X}", 1.0)) for X in "XYZ")[:dim],
+            dxyz=tuple(
+                cls._float(parameters.pop(f"D{X}", "varying").lower()) for X in "XYZ"
+            )[:dim],
             xyz0=tuple(float(parameters.pop(f"{X}0", np.nan)) for X in "XYZ")[:dim],
             Nt=Nt,
             t0=float(parameters.pop("t0", 0)),
-            dt=float(parameters.pop("dt", 1)),
+            dt=cls._float(parameters.pop("dt", "varying").lower()),
             variables=variables,
             aliases=aliases,
             constants=constants,
@@ -794,6 +802,13 @@ class WData(collections.abc.Mapping):
 
         wdata = cls(**args)
         return wdata
+
+    @classmethod
+    def _float(cls, val):
+        """Return float(value) defaulting to np.nan for varying values."""
+        if val in cls._varying:
+            return np.nan
+        return float(val)
 
     def load_data(self, *names):
         """Load the specified data."""

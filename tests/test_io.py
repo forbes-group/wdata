@@ -299,3 +299,41 @@ var        current       vector    none        wdat
         assert current_.descr == "<f8"
         assert current_.vector
         assert np.allclose(current_.data, current)
+
+    @pytest.mark.filterwarnings("error")
+    def test_issue5(self, data_dir, ext):
+        x = np.array([1, 2, 4])
+        y = np.array([1, 2, 3, 4, 5])
+        xyz = [x[:, np.newaxis], y[np.newaxis, :]]
+        t = [0]
+        prefix = "tmp"
+        full_prefix = os.path.join(data_dir, prefix)
+
+        data = io.WData(prefix=prefix, data_dir=data_dir, xyz=xyz, t=t, ext=ext)
+        assert np.isnan(data.dt)
+        assert np.isnan(data.dxyz[0])
+        assert np.allclose(1.0, data.dxyz[1])
+        data.save()
+
+        infofile = f"{full_prefix}.wtxt"
+        with open(infofile, "r") as f:
+            found = set()
+            for line in f.readlines():
+                if line.startswith("DX"):
+                    found.add("DX")
+                    assert line == "DX         varying    # Spacing in X direction\n"
+                if line.startswith("DY"):
+                    found.add("DY")
+                    assert line == "DY             1.0    #        ... Y ...\n"
+                if line.startswith("dt"):
+                    found.add("dt")
+                    assert (
+                        line == "dt         varying    # Time interval between frames\n"
+                    )
+            assert len(found) == 3
+
+        wdata = io.WData.load(infofile=infofile)
+
+        assert np.isnan(wdata.dt)
+        assert np.isnan(wdata.dxyz[0])
+        assert np.allclose(1.0, wdata.dxyz[1])
