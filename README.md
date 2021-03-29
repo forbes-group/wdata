@@ -270,6 +270,7 @@ directly calls `__init__()`.  Keep this in mind when writing the docstrings.
 
 Changes
 =======
+## 0.1.4
 
 ## 0.1.3
 * Address issue #4 for loading large datasets.  We now use memory mapped files.
