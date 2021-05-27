@@ -174,6 +174,7 @@ class IWData(IMapping):
         variables=None,
         aliases=None,
         constants=None,
+        check_data=True,
     ):
         """Constructor.
 
@@ -209,6 +210,11 @@ class IWData(IMapping):
 
         variables : [IVar]
            List of Variables.
+        
+        check_data : bool
+           If True, then upon initialization try to load all the data and check
+           that the dimensions are consistent.
+           (New in version 0.1.4)
         """
 
     def get_metadata(header=None):
@@ -434,6 +440,7 @@ class WData(collections.abc.Mapping):
         variables=None,
         aliases=None,
         constants=None,
+        check_data=True,
     ):
         self.prefix = prefix
         self.description = description
@@ -444,6 +451,7 @@ class WData(collections.abc.Mapping):
         self.constants = constants
         self.xyz, self.Nxyz, self.dxyz, self.xyz0 = xyz, Nxyz, dxyz, xyz0
         self.t, self.Nt, self.dt, self.t0 = t, Nt, dt, t0
+        self.check_data = check_data
         self.init()
 
     def init(self):
@@ -512,7 +520,7 @@ class WData(collections.abc.Mapping):
         self.t, self.Nt, self.dt, self.t0 = t, Nt, dt, t0
 
         # Check variables
-        if self.variables is not None:
+        if self.check_data and self.variables is not None:
             dim = self.dim
             Nt = self.Nt
             for var in self.variables:
@@ -673,11 +681,11 @@ class WData(collections.abc.Mapping):
                 var.write_data(filename=filename, force=force, ext=self.ext)
 
     @classmethod
-    def load(cls, infofile=None, full_prefix=None):
+    def load(cls, infofile=None, full_prefix=None, **kw):
         if infofile is not None:
             # Load from infofile
             if full_prefix is None:
-                return cls.load_from_infofile(infofile=infofile)
+                return cls.load_from_infofile(infofile=infofile, **kw)
             raise ValueError(
                 f"Got both infofile={infofile} and" + f" full_prefix={full_prefix}."
             )
@@ -687,13 +695,13 @@ class WData(collections.abc.Mapping):
         # Check if full_prefix shows an infofile.
         infofile = ".".join([full_prefix, cls._infofile_extension])
         if os.path.exists(infofile):
-            return cls.load_from_infofile(infofile=infofile)
+            return cls.load_from_infofile(infofile=infofile, **kw)
 
         # No infofile option.
         raise NotImplementedError()
 
     @classmethod
-    def load_from_infofile(cls, infofile):
+    def load_from_infofile(cls, infofile, **kw):
         """Load data from specified infofile."""
         with open(infofile, "r") as f:
             lines = f.readlines()
@@ -799,6 +807,7 @@ class WData(collections.abc.Mapping):
             aliases=aliases,
             constants=constants,
         )
+        args.update(kw)
 
         wdata = cls(**args)
         return wdata
