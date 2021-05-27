@@ -231,7 +231,8 @@ dt        1 # time interval between cycles
 # variables
 # tag           name     type      unit      format
 var        density       real      none        wdat
-var        current       vector    none        wdat
+var        current2      vector    none        wdat
+var        current3      vector    none        wdat
 """
             )
 
@@ -253,13 +254,23 @@ var        current       vector    none        wdat
         wx, wy = 2 * np.pi / Lxyz
         cos, sin = np.cos, np.sin
         density = np.array([cos(wx * t * x) * cos(wy * t * y) for t in ts])
-        current = np.array(
+        current2 = np.array(
             [
                 [cos(wx * t * x) * cos(wx * t * y), sin(wx * t * x) * sin(wx * t * y)]
                 for t in ts
             ]
         )
-        vars = dict(density=density, current=current)
+        current3 = np.array(
+            [
+                [
+                    cos(wx * t * x) * cos(wx * t * y),
+                    sin(wx * t * x) * sin(wx * t * y),
+                    0 * t * x * y,
+                ]
+                for t in ts
+            ]
+        )
+        vars = dict(density=density, current2=current2, current3=current3)
         for var in vars:
             with open(f"{full_prefix}_{var}.wdat", "wb") as f:
                 f.write(np.ascontiguousarray(vars[var]).tobytes())
@@ -280,7 +291,7 @@ var        current       vector    none        wdat
         assert np.allclose(wdata.t0, 0)
         assert np.allclose(wdata.dt, 1)
 
-        (density_, current_) = wdata.variables
+        (density_, current2_, current3_) = wdata.variables
 
         assert density_.name == "density"
         assert density_.description == ""
@@ -291,14 +302,23 @@ var        current       vector    none        wdat
         assert not density_.vector
         assert np.allclose(density_.data, density)
 
-        assert current_.name == "current"
-        assert current_.description == ""
-        assert current_.ext == "wdat"
-        assert current_.unit == "none"
-        assert current_.filename == f"{full_prefix}_current.wdat"
-        assert current_.descr == "<f8"
-        assert current_.vector
-        assert np.allclose(current_.data, current)
+        assert current2_.name == "current2"
+        assert current2_.description == ""
+        assert current2_.ext == "wdat"
+        assert current2_.unit == "none"
+        assert current2_.filename == f"{full_prefix}_current2.wdat"
+        assert current2_.descr == "<f8"
+        assert current2_.vector
+        assert np.allclose(current2_.data, current2)
+
+        assert current3_.name == "current3"
+        assert current3_.description == ""
+        assert current3_.ext == "wdat"
+        assert current3_.unit == "none"
+        assert current3_.filename == f"{full_prefix}_current3.wdat"
+        assert current3_.descr == "<f8"
+        assert current3_.vector
+        assert np.allclose(current3_.data, current3)
 
     @pytest.mark.filterwarnings("error")
     def test_issue5(self, data_dir, ext):
@@ -337,3 +357,8 @@ var        current       vector    none        wdat
         assert np.isnan(wdata.dt)
         assert np.isnan(wdata.dxyz[0])
         assert np.allclose(1.0, wdata.dxyz[1])
+
+    @pytest.mark.filterwarnings("error")
+    def test_issue8(self, data_dir, ext):
+        """Check that vectors work with 1, 2, and 3 components."""
+        pass
