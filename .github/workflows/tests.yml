@@ -21,3 +21,7 @@ jobs:
     - name: Test with pytest (run with nox)
       run: |
         nox -p ${{ matrix.python-version }}
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
+      with:
+        fail_ci_if_error: false

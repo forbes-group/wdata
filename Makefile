@@ -17,4 +17,5 @@ README-test.html: README.md
 clean:
 	-rm -rf .nox
 	-rm README*.html
-
+	-find . -type d -name "__pycache__" -exec rm -rf {} \;
+	-find . -type f -name "*.pyc" -delete

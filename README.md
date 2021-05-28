@@ -3,6 +3,7 @@ W-data Format
 <!-- [Documentation Status](https://readthedocs.org/projects/wdata/badge/?version=latest)](https://wdata.readthedocs.io/en/latest/?badge=latest) -->
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/forbes-group/wdata.svg)](https://lgtm.com/projects/g/forbes-group/wdata/context:python)
 [![Tests](https://github.com/forbes-group/wdata/actions/workflows/tests.yml/badge.svg)](https://github.com/forbes-group/wdata/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/forbes-group/wdata/branch/branch/default/graph/badge.svg?token=U1GRP9B06D)](https://codecov.io/gh/forbes-group/wdata)
 [![Pypi](https://img.shields.io/pypi/v/wdata.svg)](https://pypi.python.org/pypi/wdata)
 [![pyversions](https://img.shields.io/pypi/pyversions/wdata.svg)](https://pypi.python.org/pypi/wdata)[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
