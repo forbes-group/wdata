@@ -21,6 +21,37 @@ def ext(request):
     yield request.param
 
 
+@pytest.fixture(params=[1, 2, 3])
+def dim(request):
+    yield request.param
+
+
+@pytest.fixture(params=[1, 2, 3])
+def data(data_dir, ext, dim):
+    """Reasonable datasets for testing."""
+    Nt = 4
+    Nxyz = (4, 8, 16)
+    dxyz = (0.1, 0.2, 0.3)
+
+    variables = [
+        io.Var(density=np.random.random((Nt,) + Nxyz[:dim])),
+        io.Var(current1=np.random.random((Nt, 1) + Nxyz[:dim])),
+        io.Var(current2=np.random.random((Nt, 2) + Nxyz[:dim])),
+        io.Var(current3=np.random.random((Nt, 3) + Nxyz[:dim])),
+    ]
+
+    data = io.WData(
+        prefix="tmp",
+        data_dir=data_dir,
+        Nxyz=Nxyz,
+        dxyz=dxyz,
+        variables=variables,
+        Nt=Nt,
+    )
+
+    yield data
+
+
 class TestIO:
     def test_interfaces(self, data_dir):
         assert verifyClass(io.IVar, io.Var)
@@ -358,7 +389,9 @@ var        current3      vector    none        wdat
         assert np.isnan(wdata.dxyz[0])
         assert np.allclose(1.0, wdata.dxyz[1])
 
-    @pytest.mark.filterwarnings("error")
-    def test_issue8(self, data_dir, ext):
-        """Check that vectors work with 1, 2, and 3 components."""
+
+class TestErrors(object):
+    """Test coverage and errors."""
+
+    def test_invalid_vector(self, data):
         pass
