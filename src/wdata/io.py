@@ -29,7 +29,6 @@ See Also
 * https://numpy.org/doc/stable/reference/generated/numpy.memmap.html
 
 """
-import collections.abc
 from collections import OrderedDict
 import os.path
 from warnings import warn
@@ -41,7 +40,6 @@ from pytz import timezone
 import tzlocal
 
 from zope.interface import implementer, Attribute, Interface
-from zope.interface.common.collections import IMapping
 
 
 class IVar(Interface):
@@ -121,7 +119,7 @@ class IVar(Interface):
         """
 
 
-class IWData(IMapping):
+class IWData(Interface):
     """Interface of a complete dataset.
 
     Also used to define abscissa as follows::
@@ -288,6 +286,9 @@ class IWData(IMapping):
         Returns the data of the named variable or the named
         constant, following aliases if defined."""
 
+    def keys():
+        """Return the valid keys."""
+
 
 @implementer(IVar)
 class Var(object):
@@ -439,7 +440,7 @@ class Var(object):
 
 
 @implementer(IWData)
-class WData(collections.abc.Mapping):
+class WData(object):
     """Base implementation."""
 
     # This is the extension used for infofiles
@@ -515,7 +516,7 @@ class WData(collections.abc.Mapping):
             else:
                 # Allow for individual None values or NaN values.
                 xyz0 = tuple(
-                    _x0 if (x0 is None or x0 != x0) else x0
+                    _x0 if (x0 is None or np.isnan(x0)) else x0
                     for x0, _x0 in zip(xyz0, _xyz0)
                 )
 
@@ -872,15 +873,24 @@ class WData(collections.abc.Mapping):
         """Load the specified data."""
         raise NotImplementedError
 
-    def __getattr__(self, key):
-        try:
-            return self[key]
-        except (KeyError, AttributeError):
-            return super().__getattribute__(key)
+    def keys(self):
+        keys = set([_var.name for _var in self.variables])
+        if self.aliases:
+            keys.update(self.aliases)
+        if self.constants:
+            keys.update(self.constants)
+        return sorted(keys)
 
-    ######################################################################
-    # Methods for the IMapping interface.  Used by collections.abc.Mapping
-    def __getitem__(self, key):
+    def __dir__(self):
+        return self.keys()
+
+    def __iter__(self):
+        return self.keys().__iter__()
+
+    def __len__(self):
+        return len(self.keys())
+
+    def __getattr__(self, key):
         if self.aliases:
             key = self.aliases.get(key, key)
         if self.variables:
@@ -893,21 +903,7 @@ class WData(collections.abc.Mapping):
         if self.constants and key in self.constants:
             return self.constants[key]
 
-        raise KeyError(key)
-
-    def keys(self):
-        keys = set([_var.name for _var in self.variables])
-        if self.aliases:
-            keys.update(self.aliases)
-        if self.constants:
-            keys.update(self.constants)
-        return sorted(keys)
-
-    def __iter__(self):
-        return self.keys().__iter__()
-
-    def __len__(self):
-        return len(self.keys())
+        return super().__getattribute__(key)
 
     ######################################################################
     ####################

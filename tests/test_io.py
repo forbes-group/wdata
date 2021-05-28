@@ -211,8 +211,8 @@ const         kF           1
         assert wdata.Nxyz == (24, 28, 32)
         assert wdata.xyz0 == (-24 / 2, -28 / 2, -32 / 2)
         assert wdata.dxyz == (1, 1, 1)
-        assert wdata["eF"] == 0.5
-        assert wdata["kF"] == 1.0
+        assert wdata.eF == 0.5
+        assert wdata.kF == 1.0
         assert sorted(wdata) == [
             "current_a",
             "current_b",
@@ -228,7 +228,7 @@ const         kF           1
         assert np.allclose(wdata.dt, 1)
 
         density_a, delta_, current_a = wdata.variables
-        assert wdata["density_a"] is density_a.data
+        assert wdata.density_a is density_a.data
         assert density_a.name == "density_a"
         assert density_a.description == ""
         assert density_a.filename.endswith(".wdat")
@@ -636,14 +636,19 @@ class TestErrors:
         with pytest.warns(
             UserWarning, match="Variable x hides constant of the same name"
         ):
-            data["x"]
+            data.x
 
         data = io.WData(Nxyz=(4, 5), t=[1, 2], variables=[x], constants=dict(y=3))
-        with pytest.raises(KeyError) as excinfo:
-            data["q"]
-        assert str(excinfo.value) == "'q'"
+        with pytest.raises(AttributeError) as excinfo:
+            data.q
+        assert str(excinfo.value) == "'WData' object has no attribute 'q'"
 
         data.keys()
+
+    def test__dir__(self):
+        x = io.Var(x=np.zeros((2, 4, 5)))
+        data = io.WData(Nxyz=(4, 5), t=[1, 2], variables=[x], constants=dict(x=3))
+        assert dir(data) == ["x"]
 
     def test_load_errors(self, data_dir):
         with pytest.raises(ValueError) as excinfo:
