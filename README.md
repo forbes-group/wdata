@@ -31,7 +31,7 @@ Installation
 ------------
 
 ```bash
-pip install wdata
+python3 -m pip install wdata
 ```
 
 Basic Usage
@@ -280,7 +280,7 @@ Changes
 * Fixed many small bugs discovered by 100% coverage testing.
 * Pass-through `kwargs` from `io.WData.load()` etc. to constructor.
 * Added `check_data` flag to optionally disable testing of data.
-
+* Remove item-access.  Use attribute access instead: `data.x` or `getattr(data, 'x')`.
 
 ## 0.1.3
 * Address issue #4 for loading large datasets.  We now use memory mapped files.
