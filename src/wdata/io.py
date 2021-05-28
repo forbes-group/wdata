@@ -54,9 +54,13 @@ class IVar(Interface):
 
     * Abscissa data: ``(N,)``
     * Scalar data: ``(Nt,) + Nxyz``
-    * Vector data: ``(Nt, 3) + Nxyz``
+    * Vector data: ``(Nt, Nv) + Nxyz``
 
-    Assumes that ``Nx > 3`` so that if ``shape[1] <= 3``, the data is vector.
+    Assumes that ``Nx > 3`` so that if ``shape[1] <= 3``, the data is vector with ``Nv``
+    components.  Physically, one can have ``Nv == dim`` or ``Nv == 3``.  For example, a
+    ``dim = 2`` dataset might still have ``Nv == 3`` vectors where the third component
+    indicates that there is a persistent current in the z-direction.  Although the code
+    allows ``Nv < dim``, this does not make much sense.
     """
 
     # Required attributes
@@ -210,7 +214,7 @@ class IWData(IMapping):
 
         variables : [IVar]
            List of Variables.
-        
+
         check_data : bool
            If True, then upon initialization try to load all the data and check
            that the dimensions are consistent.
@@ -403,13 +407,33 @@ class Var(object):
     def load_data(self):
         """Load the data from file."""
         if self.ext == "npy":
-            self._data = np.load(self.filename, mmap_mode="r")
+            _data = np.load(self.filename, mmap_mode="r")
         elif self.ext == "wdat":
-            self._data = np.memmap(self.filename, dtype=np.dtype(self.descr)).reshape(
-                self.shape
-            )
+            shape = self.shape
+            _data = np.memmap(self.filename, dtype=np.dtype(self.descr))
+            try:
+                _data = _data.reshape(shape)
+            except ValueError:
+                if self.vector:
+                    # Allow for the possibility that the vector has less than 3
+                    # dimensions.
+                    NtNvNxyz = np.prod(_data.shape)
+                    NtNxyz = shape[0] * np.prod(shape[2:])
+                    Nv = NtNvNxyz // NtNxyz
+                    shape = (shape[0], Nv) + shape[2:]
+                    if not NtNvNxyz % NtNxyz == 0:
+                        # Inconsistent data size
+                        raise ValueError(
+                            f"Shape of data in {self.filename} inconsistent "
+                            + f"with shape={shape}: Nv={NtNvNxyz // NtNxyz} must be an integer."
+                        )
+                    self._shape = shape
+                    _data = _data.reshape(shape)
+                else:
+                    raise
         else:
             raise NotImplementedError(f"Data format ext={self.ext} not supported.")
+        self._data = _data
 
 
 @implementer(IWData)

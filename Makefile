@@ -9,4 +9,6 @@ README-test.html: README.md
 .PHONY: all clean
 
 clean:
-	rm README*.html
+	-rm -rf .nox
+	-rm README*.html
+
