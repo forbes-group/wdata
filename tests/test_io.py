@@ -492,6 +492,11 @@ var        density       real      none         npy
             data = io.WData.load(infofile)
             assert data.prefix == prefix
 
+    # @pytest.mark.skip("Causes Bus Error!")
+    def test_issue9(self, infofile):
+        data = io.WData.load(infofile)
+        data.save(force=True)
+
     def test_save(self, infofile):
         data = io.WData.load(infofile)
         data_dir = os.path.dirname(infofile)
