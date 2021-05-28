@@ -1,3 +1,5 @@
+PANDOC_FLAGS = --toc --standalone
+
 all: README-PYPI.html README-test.html
 
 README-PYPI.html: README.md
@@ -5,6 +7,10 @@ README-PYPI.html: README.md
 
 README-test.html: README.md
 	pandoc -o $@ $< 
+
+%.html: %.md
+	pandoc $(PANDOC_FLAGS) $< -o $@  && open -g -a Safari $@
+	fswatch -e ".*\.html" -o . | while read num ; do pandoc $(PANDOC_FLAGS) $< -o $@ && open -g -a Safari $@; done
 
 .PHONY: all clean
 
