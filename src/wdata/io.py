@@ -827,7 +827,6 @@ class WData(object):
 
         Nxyz = tuple(int(parameters.pop(f"N{X}", 1)) for X in "XYZ")
         dim = int(parameters.pop("datadim", len(Nxyz)))
-        Nxyz = Nxyz
 
         Nt = int(parameters.pop("cycles", 0))
 
