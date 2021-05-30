@@ -820,7 +820,7 @@ class WData(object):
             else:
                 prefix = prefix.rsplit(".", 1)[0]
 
-            warn("No prefix specified in {infofile}: assuming prefix={prefix}")
+            warn(f"No prefix specified in {infofile}: assuming prefix={prefix}")
             parameters["prefix"] = prefix
 
         prefix = parameters["prefix"]
