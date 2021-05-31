@@ -30,6 +30,7 @@ See Also
 
 """
 from collections import OrderedDict
+import glob
 import os.path
 from warnings import warn
 
@@ -339,7 +340,7 @@ class Var(object):
     def data(self):
         """Return or load data."""
         if self._data is None:
-            self.load_data()
+            self._load_data()
         return self._data
 
     @data.setter
@@ -358,7 +359,7 @@ class Var(object):
 
     @property
     def vector(self):
-        return self.shape[1] <= 3
+        return len(self.shape) > 1 and self.shape[1] <= 3
 
     @property
     def shape(self):
@@ -405,13 +406,15 @@ class Var(object):
         else:
             raise NotImplementedError(f"Unsupported extension for '{filename}'")
 
-    def load_data(self):
+    def _load_data(self):
         """Load the data from file."""
         if self.filename.endswith(".npy"):
             _data = np.load(self.filename, mmap_mode="r")
         elif self.filename.endswith(".wdat"):
             shape = self.shape
             _data = np.memmap(self.filename, dtype=np.dtype(self.descr))
+            if shape is (None,):  # _data is an abscissa
+                shape = (len(_data),)
             try:
                 _data = _data.reshape(shape)
             except ValueError:
@@ -474,9 +477,9 @@ class WData(object):
         self.description = description
         self.data_dir = data_dir
         self.ext = ext
-        self.variables = variables
-        self.aliases = aliases
-        self.constants = constants
+        self.variables = variables if variables else []
+        self.aliases = aliases if aliases else {}
+        self.constants = constants if constants else {}
         self._dim = dim
         self.xyz, self.Nxyz, self.dxyz, self.xyz0 = xyz, Nxyz, dxyz, xyz0
         self.t, self.Nt, self.dt, self.t0 = t, Nt, dt, t0
@@ -489,38 +492,52 @@ class WData(object):
         Called by the constructor, and before saving.
         """
         # Abscissa
-        if self.xyz is not None:
-            xyz = list(map(np.ravel, self.xyz))
-            Nxyz, dxyz, xyz0 = [], [], []
-            for x in xyz:
-                dxs = np.diff(x)
-                if len(dxs) > 0:
-                    dx = dxs.mean()
-                if len(dxs) == 0 or not np.allclose(dxs, dx):
-                    dx = np.nan
-
-                Nxyz.append(len(x))
-                dxyz.append(dx)
-                xyz0.append(x[0])
-        else:
-            if self.Nxyz is None:
+        if self.Nxyz is None:
+            if self.xyz is None:
                 raise ValueError("Must provide one of xyz or Nxyz")
 
-            Nxyz, dxyz, xyz0 = self.Nxyz, self.dxyz, self.xyz0
+            xyz = []
+            for _x in self.xyz:
+                if _x is not None:
+                    _x = np.ravel(_x)
+                xyz.append(_x)
+
+            Nxyz, dxyz, xyz0 = [], [], []
+            for x in xyz:
+                Nx = None
+                x0 = dx = np.nan
+                if x is not None:
+                    dxs = np.diff(x)
+                    if len(dxs) > 0:
+                        dx = dxs.mean()
+                    if len(dxs) == 0 or not np.allclose(dxs, dx):
+                        dx = np.nan
+                    Nx = len(x)
+                    x0 = x[0]
+
+                Nxyz.append(Nx)
+                dxyz.append(dx)
+                xyz0.append(x0)
+        else:
+            xyz, Nxyz, dxyz, xyz0 = self.xyz, self.Nxyz, self.dxyz, self.xyz0
             if Nxyz[0] <= 3:
                 raise ValueError(f"First dimension of Nxyz=={Nxyz} must be > 3.")
 
-            _xyz0 = -np.array([_N * _d / 2 for _N, _d in zip(Nxyz, dxyz)])
-            if xyz0 is None:
-                xyz0 = _xyz0
-            else:
-                # Allow for individual None values or NaN values.
-                xyz0 = tuple(
-                    _x0 if (x0 is None or np.isnan(x0)) else x0
-                    for x0, _x0 in zip(xyz0, _xyz0)
-                )
+            if xyz is None:
+                xyz = (None,) * len(Nxyz)
 
-            xyz = [np.arange(_N) * _dx + _x0 for _N, _dx, _x0 in zip(Nxyz, dxyz, xyz0)]
+            if xyz0 is None:
+                xyz0 = (None,) * len(Nxyz)
+
+            # Allow for individual None values or NaN values.
+            xyz0 = [
+                -_N * _d / 2 if _x0 is None or np.isnan(_x0) else _x0
+                for _N, _d, _x0 in zip(Nxyz, dxyz, xyz0)
+            ]
+            xyz = [
+                np.arange(_N) * _dx + _x0 if _x is None else _x
+                for _x, _N, _dx, _x0 in zip(xyz, Nxyz, dxyz, xyz0)
+            ]
 
             # While Nxyz etc. can be longer than dim, if dim is specified, we must
             # truncate xyz so broadcasting works.
@@ -595,34 +612,51 @@ class WData(object):
         return self.ext
 
     def get_metadata(self, header=None):
-        # Pad these with 1's for backwards compatibility with
-        # Gabriel's existing code
-        Nxyz = self.Nxyz + (1,) * (3 - len(self.Nxyz))
+        Nxyz = self.Nxyz
         dxyz = tuple(
-            _dx if _dx not in self._varying else "varying"
-            for _dx in self.dxyz + (1,) * (3 - len(self.dxyz))
+            _dx if _dx not in self._varying else "varying" for _dx in self.dxyz
         )
         dt = self.dt if self.dt not in self._varying else "varying"
 
-        descriptors = [
-            ("NX", Nxyz[0], "Lattice size in X direction"),
-            ("NY", Nxyz[1], "            ... Y ..."),
-            ("NZ", Nxyz[2], "            ... Z ..."),
-            ("DX", dxyz[0], "Spacing in X direction"),
-            ("DY", dxyz[1], "       ... Y ..."),
-            ("DZ", dxyz[2], "       ... Z ..."),
-            ("prefix", self.prefix, "datafile prefix: <prefix>_<var>.<format>"),
-            ("datadim", self.dim, "Block size: 1:NX, 2:NX*NY, 3:NX*NY*NZ"),
-            ("cycles", self.Nt, "Number Nt of frames/cycles per dataset"),
-            ("t0", self.t0, "Time value of first frame"),
-            ("dt", dt, "Time interval between frames"),
-        ]
+        descriptors = (
+            [
+                (f"N{_x}".lower(), _N, _l)
+                for _x, _N, _l in zip(
+                    "xyz",
+                    Nxyz,
+                    (
+                        "Lattice size in x direction",
+                        "            ... y ...",
+                        "            ... z ...",
+                    ),
+                )
+            ]
+            + [
+                (f"d{_x}".lower(), _N, _l)
+                for _x, _N, _l in zip(
+                    "xyz",
+                    dxyz,
+                    (
+                        "Spacing in x direction",
+                        "       ... y ...",
+                        "       ... z ...",
+                    ),
+                )
+            ]
+            + [
+                ("prefix", self.prefix, "datafile prefix: <prefix>_<var>.<format>"),
+                ("datadim", self.dim, "Block size: 1:Nx, 2:Nx*Ny, 3:Nx*Ny*Nz"),
+                ("cycles", self.Nt, "Number Nt of frames/cycles per dataset"),
+                ("t0", self.t0, "Time value of first frame"),
+                ("dt", dt, "Time interval between frames"),
+            ]
+        )
 
-        # Add X0, Y0, Z0 if not default
-        for x0, dx, Nx, X in zip(self.xyz0, self.dxyz, self.Nxyz, "XYZ"):
+        # Add x0, y0, z0 if not default
+        for x0, dx, Nx, x in zip(self.xyz0, self.dxyz, self.Nxyz, "xyz"):
             if dx not in self._varying and np.allclose(x0, -Nx * dx / 2):
                 continue
-            descriptors.append((f"{X}0", x0, f"First point in {X} lattice"))
+            descriptors.append((f"{x}0", x0, f"First point in {x} lattice"))
 
         # Add comments here
         lines = []
@@ -712,21 +746,19 @@ class WData(object):
         with open(infofile, "w") as f:
             f.write(metadata)
 
-        if self.variables:
-            variables = list(self.variables)
+        variables = list(self.variables)
+        if self.xyz is not None:
+            for _x, _dx, _n in zip(self.xyz, self.dxyz, "xyz"):
+                if np.isnan(_dx):
+                    # Add non-linearly varying abscissa
+                    _name = f"_{_n}"  # Abscissa start with underscores
+                    variables.append(Var(**{_name: np.ravel(_x)}))
+        if self.t is not None and np.isnan(self.dt):
+            variables.append(Var(_t=np.ravel(self.t)))
 
-            if self.xyz is not None:
-                for _x, _n in zip(self.xyz, "xyz"):
-                    variables.append(Var(**{_n: np.ravel(_x)}))
-
-            if self.t is not None:
-                variables.append(Var(t=np.ravel(self.t)))
-
-            for var in self.variables:
-                filename = os.path.join(
-                    data_dir, f"{self.prefix}_{var.name}.{self.ext}"
-                )
-                var.write_data(filename=filename, force=force)
+        for var in variables:
+            filename = os.path.join(data_dir, f"{self.prefix}_{var.name}.{self.ext}")
+            var.write_data(filename=filename, force=force)
 
     @classmethod
     def load(cls, infofile=None, full_prefix=None, **kw):
@@ -810,6 +842,7 @@ class WData(object):
                 constants[name] = eval(value, constants)
             else:
                 name, value = terms
+                name = name.lower()
                 parameters[name] = value
 
         # Process parameters
@@ -825,11 +858,38 @@ class WData(object):
 
         prefix = parameters["prefix"]
 
-        Nxyz = tuple(int(parameters.pop(f"N{X}", 1)) for X in "XYZ")
+        _xyz = "".join([_x for _x in "xyz" if f"n{_x}" in parameters])
+        Nxyz = tuple(int(parameters.pop(f"n{_x}")) for _x in _xyz)
         dim = int(parameters.pop("datadim", len(Nxyz)))
-        Nxyz = Nxyz
+        dxyz = tuple(
+            cls._float(parameters.pop(f"d{_x}", "varying").lower()) for _x in _xyz
+        )
+        xyz0 = tuple(float(parameters.pop(f"{_x}0", np.nan)) for _x in _xyz)
 
         Nt = int(parameters.pop("cycles", 0))
+        dt = cls._float(parameters.pop("dt", "varying").lower())
+
+        # Load abscissa if any dx or dt are nan indicating unequal spacing.
+        abscissa = {}
+        for _x, _dx in zip("t" + _xyz, (dt,) + dxyz):
+            if np.isnan(_dx):
+                filename = os.path.join(data_dir, f"{prefix}__{_x}.*")
+                files = sorted(glob.glob(filename))
+                if len(files) == 0:
+                    raise ValueError(
+                        f"Abscissa {_x} has varying d{_x} but no files '{filename}' found."
+                    )
+                elif len(files) > 1:
+                    warn(
+                        f"Multiple files found for varying abscissa {_x}: {files}\n"
+                        + f"Using {files[0]}"
+                    )
+                f = files[0]
+                ext = f.split(".")[-1]
+                abscissa[_x] = Var(name=_x, shape=(None,), descr=float, filename=f).data
+
+        xyz = tuple(abscissa.get(_x, None) for _x in _xyz)
+        t = abscissa.get("t", None)
 
         # Add filenames and shapes.  Defer loading until the user needs the data
         for var in variables:
@@ -846,13 +906,13 @@ class WData(object):
             data_dir=data_dir,
             dim=dim,
             Nxyz=Nxyz,
-            dxyz=tuple(
-                cls._float(parameters.pop(f"D{X}", "varying").lower()) for X in "XYZ"
-            ),
-            xyz0=tuple(float(parameters.pop(f"{X}0", np.nan)) for X in "XYZ"),
+            dxyz=dxyz,
+            xyz0=xyz0,
+            xyz=xyz,
             Nt=Nt,
             t0=float(parameters.pop("t0", 0)),
-            dt=cls._float(parameters.pop("dt", "varying").lower()),
+            dt=dt,
+            t=t,
             variables=variables,
             aliases=aliases,
             constants=constants,
@@ -945,6 +1005,28 @@ class WData(object):
             return "<c16"
 
         return type
+
+    def __eq__(self, data):
+        """Return True if the two datasets are equivalent in terms of data.
+
+        This is used for testing.
+        """
+        if (
+            self.keys() != data.keys()
+            or self.constants != data.constants
+            or self.Nxyz != data.Nxyz
+            or not np.array_equal(self.t, data.t)
+            or not any([np.array_equal(_A, _B) for _A, _B in zip(self.xyz, data.xyz)])
+        ):
+            return False
+        for key in self.keys():
+            # Iterate over times in case arrays are too big for memory
+            for i, t in enumerate(self.t):
+                if not np.array_equal(
+                    getattr(self, key)[i], getattr(data, key)[i], equal_nan=True
+                ):
+                    return False
+        return True
 
 
 def load_wdata(prefix=None, infofile=None):
