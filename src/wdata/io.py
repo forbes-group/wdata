@@ -413,7 +413,7 @@ class Var(object):
         elif self.filename.endswith(".wdat"):
             shape = self.shape
             _data = np.memmap(self.filename, dtype=np.dtype(self.descr))
-            if shape is (None,):  # _data is an abscissa
+            if shape == (None,):  # _data is an abscissa
                 shape = (len(_data),)
             try:
                 _data = _data.reshape(shape)
