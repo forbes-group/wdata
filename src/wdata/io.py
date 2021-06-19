@@ -167,7 +167,7 @@ class IWData(Interface):
         dxyz=(1, 1, 1),
         xyz0=None,
         xyz=None,
-        Nt=None,
+        Nt=0,
         t0=0,
         dt=1,
         t=None,
@@ -464,7 +464,7 @@ class WData(object):
         dxyz=(1, 1, 1),
         xyz0=None,
         xyz=None,
-        Nt=None,
+        Nt=0,
         t0=0,
         dt=1,
         t=None,
@@ -560,14 +560,12 @@ class WData(object):
             t0 = t[0]
         else:
             Nt, dt, t0 = self.Nt, self.dt, self.t0
-            if Nt is None:
+            if Nt == 0:
                 if self.variables is not None:
                     for var in self.variables:
                         if var.data is not None:
                             Nt = var.data.shape[0]
                             break
-                if Nt is None:
-                    raise ValueError("Must provide t, Nt, or a variable with data")
 
             t = np.arange(Nt) * dt + t0
 

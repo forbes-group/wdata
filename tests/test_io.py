@@ -645,10 +645,6 @@ class TestErrors:
         assert str(excinfo.value) == "Must provide one of xyz or Nxyz"
 
         with pytest.raises(ValueError) as excinfo:
-            io.WData(Nxyz=(4, 5))
-        assert str(excinfo.value) == "Must provide t, Nt, or a variable with data"
-
-        with pytest.raises(ValueError) as excinfo:
             io.WData(Nxyz=(3, 4, 5), Nt=1)
         assert str(excinfo.value) == "First dimension of Nxyz==(3, 4, 5) must be > 3."
 
