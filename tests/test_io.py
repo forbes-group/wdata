@@ -464,6 +464,7 @@ var        current3      vector    none        wdat
                     assert line == "const    hbar     1.23"
             assert len(found) == 6
 
+    @pytest.mark.filterwarnings("error")
     def test_missing_prefix(self, data_dir):
         prefix = "test"
         full_prefix = os.path.join(data_dir, f"{prefix}")
@@ -491,7 +492,11 @@ var        density       real      none         npy
             infofile = f"{full_prefix}.{info_ext}"
             with open(infofile, "w") as f:
                 f.write(info_contents)
-            data = io.WData.load(infofile)
+
+            with pytest.warns(
+                UserWarning, match="No prefix specified in .*: assuming prefix=test"
+            ):
+                data = io.WData.load(infofile)
             assert data.prefix == prefix
 
     def test_save(self, infofile):
