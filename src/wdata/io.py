@@ -411,7 +411,7 @@ class Var(object):
             _data = np.load(self.filename, mmap_mode="r")
         elif self.filename.endswith(".wdat"):
             shape = self.shape
-            _data = np.memmap(self.filename, dtype=np.dtype(self.descr))
+            _data = np.memmap(self.filename, dtype=np.dtype(self.descr), mode="r")
             try:
                 _data = _data.reshape(shape)
             except ValueError:
