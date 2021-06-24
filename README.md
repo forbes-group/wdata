@@ -274,6 +274,9 @@ directly calls `__init__()`.  Keep this in mind when writing the docstrings.
 
 Changes
 =======
+## 0.1.5
+* Resolne issue #13: `WData` can now load read-only files.
+
 ## 0.1.4
 * Resolve issue #8.  Vectors can have `Nv <= dim`.  Also, keep `Nxyz` info even if
   `dim<3`: this is how plane-wave approximations are used sometimes.
