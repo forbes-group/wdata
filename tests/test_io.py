@@ -1,5 +1,7 @@
 """Test IO Routines"""
+import glob
 import os.path
+import stat
 import tempfile
 
 import numpy as np
@@ -511,6 +513,46 @@ var        density       real      none         npy
         data = io.WData(Nxyz=x.shape[1:], variables=[x])
         info = data.get_metadata()
         assert ext in info
+
+    def test_readonly(self, data_dir, ext):
+        """Issue 13: fail on read-only file systems."""
+        Nxyz = (4, 8)
+        dxyz = (0.1, 0.2)
+        prefix = "tmp"
+        full_prefix = os.path.join(data_dir, prefix)
+
+        data = io.WData(
+            prefix=prefix, data_dir=data_dir, Nxyz=Nxyz, dxyz=dxyz, Nt=1, ext=ext
+        )
+
+        xyz = data.xyz
+
+        np.random.seed(2)
+
+        psi = np.random.random(Nxyz + (2,)) - 0.5
+        psi = psi.view(dtype=complex)[..., 0]
+        assert psi.shape == Nxyz
+
+        psis = [psi]
+        densities = [abs(psi) ** 2]
+
+        data = io.WData(
+            data_dir=data_dir,
+            xyz=xyz,
+            variables=[io.Var(density=densities), io.Var(delta=psis)],
+            ext=ext,
+        )
+        data.save()
+
+        # Make files read-only
+        for (dirpath, dirnames, filenames) in os.walk(data_dir):
+            for file in filenames:
+                os.chmod(os.path.join(dirpath, file), stat.S_IRUSR)
+
+        # Try loading
+        res = io.WData.load(full_prefix=full_prefix)
+        assert np.allclose(res.delta, psi)
+        assert np.allclose(res.density, densities)
 
 
 class TestVar:
