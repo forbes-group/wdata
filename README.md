@@ -274,8 +274,19 @@ directly calls `__init__()`.  Keep this in mind when writing the docstrings.
 
 Changes
 =======
+## 0.1.6
+* Resolve issue #10: Provide working abscissa.  This allows the user to provide abscissa
+  like `x` that are not equally spaced.  These will be stored as data.
+* Resolve issue #14: More flexible loading, providing defaults for missing optional
+  values, and allowing for extra new but unused values (particularly, units provided for
+  consts).
+* Update to new W-Data format which specifies that all special parameters (`nx`, `dx`,
+  `t0`, etc.) should be case insensitive.
+* Changed default value of `nt` to `0` so that we can have load and test empty datasets.
+* Update and include [`poetry.lock`](https://python-poetry.org/docs/libraries/#lock-file).
+  
 ## 0.1.5
-* Resolne issue #13: `WData` can now load read-only files.
+* Resolve issue #13: `WData` can now load read-only files.
 
 ## 0.1.4
 * Resolve issue #8.  Vectors can have `Nv <= dim`.  Also, keep `Nxyz` info even if

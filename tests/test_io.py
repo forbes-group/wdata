@@ -1,7 +1,8 @@
 """Test IO Routines"""
-import glob
 import os.path
+import re
 import stat
+from pathlib import Path
 import tempfile
 
 import numpy as np
@@ -258,6 +259,26 @@ const         kF           1
         assert current_a.vector
         assert np.allclose(current_a.data, gradient)
 
+    def test_save(self, infofile):
+        data = io.WData.load(infofile)
+        data_dir = os.path.dirname(infofile)
+        new_data_dir = os.path.join(data_dir, "new")
+        data.data_dir = new_data_dir
+        data.save(force=True)
+
+    def test_dts(self):
+        data = io.WData(Nxyz=(4, 5, 6), t=[1, 2, 3, 4, 5])
+        assert data.dt == 1
+        data = io.WData(Nxyz=(4, 5, 6), t=[1, 2, 3, 5])
+        assert np.isnan(data.dt)
+
+    def test__get_ext(self, ext):
+        x = io.Var(x=np.zeros((1, 4, 5)), filename=f"x.{ext}")
+
+        data = io.WData(Nxyz=x.shape[1:], variables=[x])
+        info = data.get_metadata()
+        assert ext in info
+
     ######################################################################
     # Regression tests
     def test_issue_2(self, data_dir):
@@ -393,12 +414,12 @@ var        current3      vector    none        wdat
         with open(infofile, "r") as f:
             found = set()
             for line in f.readlines():
-                if line.startswith("DX"):
-                    found.add("DX")
-                    assert line == "DX         varying    # Spacing in X direction\n"
-                if line.startswith("DY"):
-                    found.add("DY")
-                    assert line == "DY             1.0    #        ... Y ...\n"
+                if line.startswith("dx"):
+                    found.add("dx")
+                    assert line == "dx         varying    # Spacing in x direction\n"
+                if line.startswith("dy"):
+                    found.add("dy")
+                    assert line == "dy             1.0    #        ... y ...\n"
                 if line.startswith("dt"):
                     found.add("dt")
                     assert (
@@ -439,12 +460,12 @@ var        current3      vector    none        wdat
         with open(infofile, "r") as f:
             found = set()
             for line in f.readlines():
-                if line.startswith("DX"):
-                    found.add("DX")
-                    assert line == "DX         varying    # Spacing in X direction\n"
-                if line.startswith("DY"):
-                    found.add("DY")
-                    assert line == "DY             1.0    #        ... Y ...\n"
+                if line.startswith("dx"):
+                    found.add("dx")
+                    assert line == "dx         varying    # Spacing in x direction\n"
+                if line.startswith("dy"):
+                    found.add("dy")
+                    assert line == "dy             1.0    #        ... y ...\n"
                 if line.startswith("dt"):
                     found.add("dt")
                     assert (
@@ -464,6 +485,7 @@ var        current3      vector    none        wdat
                     assert line == "const    hbar     1.23"
             assert len(found) == 6
 
+    @pytest.mark.filterwarnings("error")
     def test_missing_prefix(self, data_dir):
         prefix = "test"
         full_prefix = os.path.join(data_dir, f"{prefix}")
@@ -491,28 +513,12 @@ var        density       real      none         npy
             infofile = f"{full_prefix}.{info_ext}"
             with open(infofile, "w") as f:
                 f.write(info_contents)
-            data = io.WData.load(infofile)
+
+            with pytest.warns(
+                UserWarning, match="No prefix specified in .*: assuming prefix=test"
+            ):
+                data = io.WData.load(infofile)
             assert data.prefix == prefix
-
-    def test_save(self, infofile):
-        data = io.WData.load(infofile)
-        data_dir = os.path.dirname(infofile)
-        new_data_dir = os.path.join(data_dir, "new")
-        data.data_dir = new_data_dir
-        data.save(force=True)
-
-    def test_dts(self):
-        data = io.WData(Nxyz=(4, 5, 6), t=[1, 2, 3, 4, 5])
-        assert data.dt == 1
-        data = io.WData(Nxyz=(4, 5, 6), t=[1, 2, 3, 5])
-        assert np.isnan(data.dt)
-
-    def test__get_ext(self, ext):
-        x = io.Var(x=np.zeros((1, 4, 5)), filename=f"x.{ext}")
-
-        data = io.WData(Nxyz=x.shape[1:], variables=[x])
-        info = data.get_metadata()
-        assert ext in info
 
     def test_readonly(self, data_dir, ext):
         """Issue 13: fail on read-only file systems."""
@@ -616,6 +622,39 @@ class TestVar:
             data.unknown
         assert str(excinfo.value) == "'WData' object has no attribute 'unknown'"
 
+    def test_issue14(self, data_dir):
+        """Issue #14: unit for consts and variable case params."""
+        prefix = "test"
+        full_prefix = os.path.join(data_dir, f"{prefix}")
+        info_contents = """
+NX  4
+ny  5
+dx  1.0
+dy  1.0
+dt  1.0
+
+# tag   name   value   unit
+const   kF     0.5     none
+"""
+
+        for info_ext in ["wtxt", "custom"]:
+            infofile = f"{full_prefix}.{info_ext}"
+            with open(infofile, "w") as f:
+                f.write(info_contents)
+
+            with pytest.warns(None) as record:
+                data = io.WData.load(infofile)
+
+            # Check that two warnings were raised
+            assert len(record) == 1
+            assert re.match(
+                "No prefix specified in .*: assuming prefix=test",
+                str(record.pop(UserWarning).message),
+            )
+
+            assert data.prefix == prefix
+            assert dict(data.constants) == {"kF": 0.5}
+
 
 class TestErrors:
     """Test coverage and errors."""
@@ -631,17 +670,13 @@ class TestErrors:
 
         v = io.Var(name="x", filename="tmp.unknown")
         with pytest.raises(NotImplementedError) as excinfo:
-            v.load_data()
+            data = v.data
         assert str(excinfo.value) == "Data format of 'tmp.unknown' not supported."
 
     def test_wdata_errors(self):
         with pytest.raises(ValueError) as excinfo:
             io.WData()
         assert str(excinfo.value) == "Must provide one of xyz or Nxyz"
-
-        with pytest.raises(ValueError) as excinfo:
-            io.WData(Nxyz=(4, 5))
-        assert str(excinfo.value) == "Must provide t, Nt, or a variable with data"
 
         with pytest.raises(ValueError) as excinfo:
             io.WData(Nxyz=(3, 4, 5), Nt=1)
@@ -670,6 +705,13 @@ class TestErrors:
             str(excinfo.value)
             == "Variable 'x' has incompatible dim=2: data.shape = (2, 4, 4, 6)"
         )
+
+    def test_empty(self):
+        data = io.WData(Nxyz=(4, 5), t=[1, 2])
+        assert data.variables == []
+        assert data.constants == {}
+        assert data.aliases == {}
+        assert data.keys() == []
 
     @pytest.mark.filterwarnings("error")
     def test_getitem(self):
@@ -752,3 +794,110 @@ class TestErrors:
                 msg = str(excinfo.value)
                 assert "Shape of data" in msg
                 assert "Nv=0.9375 must be an integer." in msg
+
+    def test_missing_abscissa(self, data_dir, ext):
+        Nxyz = np.arange(5, 7)
+        xyz = np.meshgrid(
+            *[np.exp(np.linspace(0, 1, _N)) for _N in Nxyz], indexing="ij", sparse=True
+        )
+        t = np.exp(np.linspace(0, 1, 4))
+        data = io.WData(prefix="test1", data_dir=data_dir, xyz=xyz, t=t, ext=ext)
+        data.save()
+
+        os.remove(os.path.join(data_dir, f"{data.prefix}__t.{ext}"))
+
+        with pytest.raises(
+            ValueError, match=r"Abscissa t has varying dt but no files .* found"
+        ):
+            data1 = io.WData.load(infofile=data.infofile)
+
+    def test_extra_abscissa(self, data_dir):
+        Nxyz = np.arange(5, 7)
+        xyz = np.meshgrid(
+            *[np.exp(np.linspace(0, 1, _N)) for _N in Nxyz], indexing="ij", sparse=True
+        )
+        t = np.exp(np.linspace(0, 1, 4))
+        data = io.WData(prefix="test1", data_dir=data_dir, xyz=xyz, t=t, ext="npy")
+        data.save()
+        Path(os.path.join(data_dir, f"{data.prefix}__t.wdat")).touch()
+
+        with pytest.warns(
+            UserWarning, match=r"Multiple files found for varying abscissa t: .*"
+        ):
+            data1 = io.WData.load(infofile=data.infofile)
+
+    def test_eq(self, data_dir):
+        args = dict(prefix="test", data_dir=data_dir, Nxyz=(4, 5, 6))
+        data1 = io.WData(Nt=1, **args)
+        data2 = io.WData(Nt=2, **args)
+        assert data1 != data2
+
+        np.random.seed(3)
+        Nxyz = args["Nxyz"]
+        X1 = np.random.random(Nxyz)
+        X2 = np.random.random(Nxyz)
+
+        # Nans should be considered equal.
+        X1[0, 0] = np.nan
+        variables = [io.Var(X1=[X1])]
+        data1 = io.WData(variables=variables, **args)
+        data2 = io.WData(variables=variables, **args)
+        assert data1 == data2
+
+        data2 = io.WData(variables=[io.Var(X1=[X2])], **args)
+        assert data1 != data2
+
+        args["Nt"] = 1
+        args["variables"] = variables + [io.Var(X2=[X2])]
+        data1 = io.WData(constants={"eF": 1}, **args)
+        data2 = io.WData(constants={"eF": 2}, **args)
+        assert data1 != data2
+
+        # Aliases and constants should be case-sensitive
+        data2 = io.WData(constants={"ef": 1}, **args)
+        assert data1 != data2
+
+        data1 = io.WData(aliases={"B": "X1"}, **args)
+        data2 = io.WData(aliases={"C": "X1"}, **args)
+        assert data1 != data2
+
+        data1 = io.WData(aliases={"A": "X1"}, **args)
+        data2 = io.WData(aliases={"A": "X2"}, **args)
+        assert data1 != data2
+
+
+class TestExamples:
+    """Example datasest demonstrating various features.
+
+    In particular, we ensure round-trip from data -> file -> data.
+    """
+
+    @staticmethod
+    def check_roundtrip(data):
+        infofile = data.infofile
+        data.save()
+        data_ = io.WData.load(infofile)
+        assert data == data_
+
+    def test_minimal(self, data_dir, ext, dim):
+        Nxyz = np.arange(5, 7)[:dim]
+        data = io.WData(prefix="test1", data_dir=data_dir, Nxyz=Nxyz, Nt=1)
+        self.check_roundtrip(data)
+
+    def test_minimal_xyz(self, data_dir, ext, dim):
+        Nxyz = np.arange(5, 7)[:dim]
+        xyz = np.meshgrid(
+            *[np.linspace(0, 1, _N) for _N in Nxyz], indexing="ij", sparse=True
+        )
+        t = np.linspace(0, 2, 4)
+        data = io.WData(prefix="test1", data_dir=data_dir, xyz=xyz, t=t)
+        self.check_roundtrip(data)
+
+    def test_minimal_xyz_uneven(self, data_dir, ext, dim):
+        Nxyz = np.arange(5, 7)[:dim]
+        xyz = np.meshgrid(
+            *[np.exp(np.linspace(0, 1, _N)) for _N in Nxyz], indexing="ij", sparse=True
+        )
+        t = np.exp(np.linspace(0, 2, 4))
+        data = io.WData(prefix="test1", data_dir=data_dir, xyz=xyz, t=t)
+        self.check_roundtrip(data)
