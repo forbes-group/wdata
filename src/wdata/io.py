@@ -634,11 +634,7 @@ class WData(object):
                 for _x, _N, _l in zip(
                     "xyz",
                     dxyz,
-                    (
-                        "Spacing in x direction",
-                        "       ... y ...",
-                        "       ... z ...",
-                    ),
+                    ("Spacing in x direction", "       ... y ...", "       ... z ...",),
                 )
             ]
             + [
@@ -813,8 +809,14 @@ class WData(object):
 
         for line in lines:
             terms, comments = line
-            if terms[0] == "var":
-                name, type, unit, ext = terms[1:]
+            if terms[0].lower() == "var":
+                # tag  name     [type]   [unit]  [format]
+                # var  density   real     none    npy
+                terms.pop(0)
+                name = terms.pop(0)
+                type = terms.pop(0) if terms else None  # Optional
+                unit = terms.pop(0) if terms else None
+                ext = terms.pop(0) if terms else "npy"
 
                 # Dummy shape for now.
                 if type == "vector":
@@ -832,15 +834,27 @@ class WData(object):
                         description=" ".join(comments),
                     )
                 )
-            elif terms[0] == "link":
-                name, link = terms[1:]
+            elif terms[0].lower() == "link":
+                # tag   name       link-to
+                # link  density_b  density_a
+                terms.pop(0)
+                name = terms.pop(0)
+                link = terms.pop(0)
                 aliases[name] = link
-            elif terms[0] == "const":
-                name, value = terms[1:]
+            elif terms[0].lower() == "const":
+                # tag    name  value  [unit]
+                # const  kF    1.0     none
+                terms.pop(0)
+                name = terms.pop(0)
+                value = terms.pop(0)
+                unit = terms.pop(0) if terms else None
                 constants[name] = eval(value, constants)
             else:
-                name, value = terms
-                name = name.lower()
+                # param  value
+                # nx     24
+                name = terms.pop(0)
+                value = terms.pop(0)
+                name = name.lower()  # Parameter names are case-insensitive.
                 parameters[name] = value
 
         # Process parameters

@@ -1,5 +1,6 @@
 """Test IO Routines"""
 import os.path
+import re
 import stat
 from pathlib import Path
 import tempfile
@@ -622,17 +623,18 @@ class TestVar:
         assert str(excinfo.value) == "'WData' object has no attribute 'unknown'"
 
     def test_issue14(self, data_dir):
+        """Issue #14: unit for consts and variable case params."""
         prefix = "test"
         full_prefix = os.path.join(data_dir, f"{prefix}")
         info_contents = """
-nx  4
+NX  4
 ny  5
 dx  1.0
 dy  1.0
 dt  1.0
 
-# tag                  name                   value                    unit
-const                    kF                 1.09448                    none
+# tag   name   value   unit
+const   kF     0.5     none
 """
 
         for info_ext in ["wtxt", "custom"]:
@@ -640,8 +642,18 @@ const                    kF                 1.09448                    none
             with open(infofile, "w") as f:
                 f.write(info_contents)
 
-            data = io.WData.load(infofile)
+            with pytest.warns(None) as record:
+                data = io.WData.load(infofile)
+
+            # Check that two warnings were raised
+            assert len(record) == 1
+            assert re.match(
+                "No prefix specified in .*: assuming prefix=test",
+                str(record.pop(UserWarning).message),
+            )
+
             assert data.prefix == prefix
+            assert dict(data.constants) == {"kF": 0.5}
 
 
 class TestErrors:
