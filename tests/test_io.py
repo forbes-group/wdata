@@ -621,6 +621,28 @@ class TestVar:
             data.unknown
         assert str(excinfo.value) == "'WData' object has no attribute 'unknown'"
 
+    def test_issue14(self, data_dir):
+        prefix = "test"
+        full_prefix = os.path.join(data_dir, f"{prefix}")
+        info_contents = """
+nx  4
+ny  5
+dx  1.0
+dy  1.0
+dt  1.0
+
+# tag                  name                   value                    unit
+const                    kF                 1.09448                    none
+"""
+
+        for info_ext in ["wtxt", "custom"]:
+            infofile = f"{full_prefix}.{info_ext}"
+            with open(infofile, "w") as f:
+                f.write(info_contents)
+
+            data = io.WData.load(infofile)
+            assert data.prefix == prefix
+
 
 class TestErrors:
     """Test coverage and errors."""
