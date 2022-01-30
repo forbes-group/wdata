@@ -45,13 +45,18 @@ currents (3-component real vectors) etc. on a regular lattice of shape
 The data is represented by two classes: 
 
 * `Var`: These are the data variables such as density, currents,
-    etc. with additional metadata (ee the `wdata.io.IVar` interface for
+    etc. with additional metadata (see the `wdata.io.IVar` interface for
     details):
     * `Var.name`: Name of variable as it will appear in VisIt for example.
     * `Var.data`: The actual data as a NumPy array.
     * `Var.description`: Description.
     * `Var.filename`: The file where the data is stored on disk.
     * `Var.unit`: Unit (mainly for use in VisIt... does not affect the data.)
+    
+    Additionally, the following can be provided, but can also be inferred from the
+    `Var.data` if provided:
+    * `Var.descr`: NumPy data descriptor (`float`, `complex`, etc.)
+    * `Var.shape`: Shape of the array.
 * `WData`: This represents a complete dataset.  Some relevant attributes are (see
     `wdata.io.IWData` for details): 
     * `WData.infofile`: Location of the infofile (see below).  This is where the
@@ -65,6 +70,10 @@ The data is represented by two classes:
     * `WData.aliases`: Dictionary of aliases.  Convenience for providing alternative
         data access in VisIt.
     * `WData.constants`: Dictionary of constants such as `kF`, `eF`.
+    
+    Normally, the `WData` constructor will check that the data exists.  If you are
+    missing data, you can suppress this check by calling `WData(...,
+    check_data=False)` or `WData.load(..., check_data=False)`.
 
 **Minimal Example**:
 
@@ -274,6 +283,10 @@ directly calls `__init__()`.  Keep this in mind when writing the docstrings.
 
 Changes
 =======
+## 0.1.7
+* Resolve issue #3: Document that `WData(..., check_data=False)` allows one to skip
+  check of data.  (Also added better support for saving `WData()` objects with partial data.)
+
 ## 0.1.6
 * Resolve issue #10: Provide working abscissa.  This allows the user to provide abscissa
   like `x` that are not equally spaced.  These will be stored as data.
