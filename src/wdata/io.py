@@ -861,7 +861,7 @@ class WData(object):
                 terms.pop(0)
                 name = terms.pop(0)
                 value = terms.pop(0)
-                unit = terms.pop(0) if terms else None
+                # unit = terms.pop(0) if terms else None
                 constants[name] = eval(value, constants)
             else:
                 # param  value
@@ -911,7 +911,7 @@ class WData(object):
                         + f"Using {files[0]}"
                     )
                 f = files[0]
-                ext = f.split(".")[-1]
+                # ext = f.split(".")[-1]
                 abscissa[_x] = Var(name=_x, shape=(None,), descr=float, filename=f).data
 
         xyz = tuple(abscissa.get(_x, None) for _x in _xyz)
