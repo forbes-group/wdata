@@ -249,7 +249,7 @@ class IWData(Interface):
             data files.  Otherwise, raise an IOError.
         """
 
-    def load(infofile=None, full_prefix=None):
+    def load(infofile=None, full_prefix=None, check_data=True):
         """Load data from disk.
 
         Arguments
@@ -265,7 +265,10 @@ class IWData(Interface):
 
             The full_prefix will be split at the final path
             separation and what follows will be the ``prefix``.
-
+        check_data : bool
+            If `True` (default), then check that the data exists and is consistent with
+            the description.  Can be set to `False` if data is missing.  One will then
+            have an error later if the data is accessed.
 
         **No infofile option**
 
@@ -759,11 +762,14 @@ class WData(object):
             variables.append(Var(_t=np.ravel(self.t)))
 
         for var in variables:
+            if var._data is None:
+                continue
             filename = os.path.join(data_dir, f"{self.prefix}_{var.name}.{self.ext}")
             var.write_data(filename=filename, force=force)
 
     @classmethod
-    def load(cls, infofile=None, full_prefix=None, **kw):
+    def load(cls, infofile=None, full_prefix=None, check_data=True, **kw):
+        kw.update(check_data=check_data)
         if infofile is not None:
             # Load from infofile
             if full_prefix is None:
@@ -997,17 +1003,23 @@ class WData(object):
         var : IVar
             Variable.
         """
-        if len(var.data.shape) == 1:
+        if len(var.shape) == 1:
             return "abscissa"
         elif var.vector:
-            assert var.descr == "<f8"
+            assert var.descr == "<f8" 
             return "vector"
-        elif var.descr == "<c16":
+
+        descr = np.dtype(var.descr)
+        
+        if descr == "<c16":
             return "complex"
-        elif var.descr == "<f8":
+        elif descr == "<f8":
             return "real"
         else:
-            return var.descr
+            assert len(descr.descr) == 1
+            assert len(descr.descr[0]) == 2
+            assert descr.descr[0][0] == ""
+            return descr.descr[0][1]
 
     @staticmethod
     def _get_descr(type):

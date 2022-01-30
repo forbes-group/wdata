@@ -63,6 +63,39 @@ def infofile(data_dir, ext, dim):
     yield infofile
 
 
+@pytest.fixture
+def infofile0(data_dir):
+    """Reasonable infofile for testing with no data."""
+    Nt = 4
+    Nxyz = (4, 8)
+    dxyz = (0.1, 0.2)
+    dim = 2
+
+    variables = [
+        io.Var(name="density", filename="density.npy", descr=float, shape=Nxyz),
+        io.Var(name="delta",  filename="delta.npy", descr=complex, shape=Nxyz),
+    ]
+
+    data = io.WData(
+        prefix="tmp",
+        data_dir=data_dir,
+        dim=dim,
+        Nxyz=Nxyz,
+        dxyz=dxyz,
+        variables=variables,
+        Nt=Nt,
+        aliases={"n": "density"},
+        constants=dict(hbar=1.23),
+        check_data=False,
+    )
+
+    data.save()
+    infofile = data.infofile
+    del data
+
+    yield infofile
+
+
 class TestIO:
     def test_interfaces(self, data_dir):
         assert verifyClass(io.IVar, io.Var)
@@ -432,7 +465,7 @@ var        current3      vector    none        wdat
         assert np.isnan(wdata.dt)
         assert np.isnan(wdata.dxyz[0])
         assert np.allclose(1.0, wdata.dxyz[1])
-
+        
     def test_metadata(self, data_dir, ext):
         x = np.array([1, 2, 3, 5])
         y = np.array([1, 2, 3, 4, 5])
@@ -560,6 +593,87 @@ var        density       real      none         npy
         assert np.allclose(res.delta, psi)
         assert np.allclose(res.density, densities)
 
+    def test_issue_3_missing_data(self, data_dir, ext):
+        """Regression test for issue #3 - missing data files.
+
+        These should only raise errors when the data is loaded, not at the start.
+        """
+        prefix = "test"
+        full_prefix = os.path.join(data_dir, f"{prefix}")
+        infofile = f"{full_prefix}.wtxt"
+        with open(infofile, "w") as f:
+            f.write(f"""
+NX        5   # lattice
+NY        6   # lattice
+DX        1.2 # spacing
+DY        1.3 # spacing
+prefix test   # prefix for files ... files have names prefix_variable.format
+cycles   10   # number of cycles (measurements)
+t0        0.1 # time value for the first cycle
+dt        1.1 # time interval between cycles
+
+# variables
+# tag           name     type      unit      format
+var          density     real      none        {ext}
+var            delta  complex      none        {ext}
+"""
+            )
+
+        Nxyz = (5, 6)
+        dxyz = (1.2, 1.3)
+        Nt = cycles = 10
+        t0 = 0.1
+        dt = 1.1
+        xyz = np.meshgrid(
+            *((np.arange(_N) - _N / 2) * _dx for _N, _dx in zip(Nxyz, dxyz)),
+            indexing="ij",
+            sparse=True,
+        )
+        ts = np.arange(Nt) * dt + t0
+
+        # Construct some data
+        x, y = xyz
+        Lxyz = np.multiply(Nxyz, dxyz)
+        wx, wy = 2 * np.pi / Lxyz
+        cos, sin = np.cos, np.sin
+        density = np.array(
+            [cos(wx * t * x) * cos(wy * t * y) for t in ts]
+        )
+        delta = 1 + 1j * density
+        vars = dict(density=density, delta=delta)
+
+        # Save density data, but not delta
+        if ext == "wdat":
+            with open(f"{full_prefix}_density.wdat", "wb") as f:
+                f.write(np.ascontiguousarray(density).tobytes())
+        else:
+            assert ext == "npy"
+            np.save(f"{full_prefix}_density.npy", density)
+        
+        # Load without writing delta raises an error if we check the data
+        with pytest.raises(FileNotFoundError, match=f".*test_delta.{ext}"):
+            wdata = io.WData.load(infofile=infofile, check_data=True)
+
+        # This is the default behaviour
+        with pytest.raises(FileNotFoundError, match=f".*test_delta.{ext}"):
+            wdata = io.WData.load(infofile=infofile)
+
+        # But it can be suppressed
+        wdata = io.WData.load(infofile=infofile, check_data=False)
+
+        # Existing data can be loaded
+        assert np.allclose(wdata.density, density)
+
+        # But missing data will throw an exception
+        with pytest.raises(FileNotFoundError, match=f".*test_delta.{ext}"):
+            wdata.delta
+
+    def test_incorrect_arguments(self, infofile0):
+        """Test that incorrect arguments raise an error."""
+        wdata = io.WData.load(infofile0, check_data=False)
+        with pytest.raises(TypeError, match="unexpected keyword argument 'check_dat'"):
+            wdata = io.WData.load(infofile0, check_dat=False)
+
 
 class TestVar:
     def test_descr(self):
@@ -622,7 +736,7 @@ class TestVar:
             data.unknown
         assert str(excinfo.value) == "'WData' object has no attribute 'unknown'"
 
-    def test_issue14(self, data_dir):
+    def test_issue_14(self, data_dir):
         """Issue #14: unit for consts and variable case params."""
         prefix = "test"
         full_prefix = os.path.join(data_dir, f"{prefix}")
