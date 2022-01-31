@@ -4,19 +4,19 @@ Binary data is stored in one of the following formats denoted by their
 extension:
 
 wdata:
-   Filename ends in ``.wdat``.  This is a simple binary format
-   contiguous in C ordering.  In this format there is no information
-   about the size, datatype, or shape of the data.  Thus, a
-   corresponding metadata file is needed.
+    Filename ends in ``.wdat``.  This is a simple binary format
+    contiguous in C ordering.  In this format there is no information
+    about the size, datatype, or shape of the data.  Thus, a
+    corresponding metadata file is needed.
 npy:
-   Filename ends in ``.wdat``  This is the NPY format.  This includes
-   the size and datatype, so one can infer the type of data without a
-   metadata file.  We assume that the shape is one of:
+    Filename ends in ``.wdat``  This is the NPY format.  This includes
+    the size and datatype, so one can infer the type of data without a
+    metadata file.  We assume that the shape is one of:
 
-   * ``(Nt,) + Nxyz``: Scalar data with `Nt` blocks each of shape ``Nxyz``.
-   * ``(Nt, Nv) + Nxyz``: Vector data with ``Nt`` blocks, and ``Nv <= 3``
-     components each.  Note: we assume ``Nx > 3`` so that these two cases
-     can be distinguished by looking at ``shape[1]``.
+    * ``(Nt,) + Nxyz``: Scalar data with `Nt` blocks each of shape ``Nxyz``.
+    * ``(Nt, Nv) + Nxyz``: Vector data with ``Nt`` blocks, and ``Nv <= 3``
+        components each.  Note: we assume ``Nx > 3`` so that these two cases
+        can be distinguished by looking at ``shape[1]``.
 
 Note: Both of these formats are simple binary representations, and hence can be loaded
 as memory mapped files.  We do this by default in the current code so users can extract
@@ -88,21 +88,21 @@ class IVar(Interface):
         Arguments
         ---------
         name : str
-           Name of the variable.  If not provided, then the data
-           should be set using kwarg syntax ``__init__(name=data)``.
+            Name of the variable.  If not provided, then the data
+            should be set using kwarg syntax ``__init__(name=data)``.
         kwargs : {name: data}
-           If no name is provided, then kwargs should have a single
-           entry which is the data and the key is the name.
+            If no name is provided, then kwargs should have a single
+            entry which is the data and the key is the name.
         filename : str
-           Name of file (including path).
+            Name of file (including path).
 
         description : str
-           Single-line comment for variable.  Defaults to the name.
+            Single-line comment for variable.  Defaults to the name.
         unit : str
-           Unit of data for metadata file.
+            Unit of data for metadata file.
         shape : tuple, None
-           If no data is provided, then this is needed so that wdat
-           files can be loaded.
+            If no data is provided, then this is needed so that wdat
+            files can be loaded.
         """
 
     def write_data(filename=None, force=False):
@@ -111,12 +111,12 @@ class IVar(Interface):
         Arguments
         ---------
         filename : str, None
-           Filename.  Data type is determined by the extension.
-           Currently supported values are ``'wdat'`` (pure binary) and ``'npy'`` for the
-           numpy NPY format.  Uses ``self.filename`` if not provided.
+            Filename.  Data type is determined by the extension.
+            Currently supported values are ``'wdat'`` (pure binary) and ``'npy'`` for the
+            numpy NPY format.  Uses ``self.filename`` if not provided.
         force : bool
-           If True, overwrite existing files, otherwise raise IOError
-           if file exists.
+            If True, overwrite existing files, otherwise raise IOError
+            if file exists.
         """
 
 
@@ -128,8 +128,16 @@ class IWData(Interface):
         x = np.arange(Nx)*dx + x0
         t = np.arange(Nt)*dt + t0
 
-    If not provided, the default values are ``x0 = -Lx/2 = -Nx*dx/2`` so
-    that the spatial abscissa are centered on the orgin and ``t0 = 0``.
+    If not provided, the default values are ``x0 = -dx * (Nx // 2)`` so
+    that the spatial abscissa are centered and include the origin and ``t0 = 0``. (This
+    is the default behavior of :class:`mmfutils.math.bases.basis.PeriodicBasis` as over
+    version 0.6.0.)
+
+    >>> data = WData(Nxyz=(5,), Nt=4)
+    >>> data.xyz
+    [array([-2.5, -1.5, -0.5,  0.5,  1.5])]
+    >>> data.t
+    [0, 1, 2]
     """
 
     prefix = Attribute("Prefix for all data files")
@@ -181,44 +189,44 @@ class IWData(Interface):
         Arguments
         ---------
         prefix : str
-           Prefix for files.  Default is ``'tmp'`` allowing this class to
-           be used to generate abscissa.
+            Prefix for files.  Default is ``'tmp'`` allowing this class to
+            be used to generate abscissa.
         description : str
-           User-friendly description of the data.  Will be inserted as
-           a comment in the metadata file.
+            User-friendly description of the data.  Will be inserted as
+            a comment in the metadata file.
         data_dir : str
-           Path to the directory containing the data.
+            Path to the directory containing the data.
         ext : str
-           Default extension for data file format used if variables do
-           not specify something else.  Also used for abscissa.
+            Default extension for data file format used if variables do
+            not specify something else.  Also used for abscissa.
 
         Nxyz : (int,)*dim
 
         Nxyz, dxyz, xyz0 : (int,)*dim, (float,)*dim, (float,)*dim or None
-           If these are provided, then the abscissa ``xyz`` are computed
-           with equal spacings ``x = np.arange(Nx)*dx + x0``.  Default
-           offeset (if ``xyz0 == None``) is centered ``x0 = -Lx/2 = -Nx*dx/2``.
+            If these are provided, then the abscissa ``xyz`` are computed
+            with equal spacings ``x = np.arange(Nx)*dx + x0``.  Default
+            offeset (if ``xyz0 == None``) is centered ``x0 = -dx * (Nx // 2)``.
 
-           New in version 0.1.4, we allow `dim <= len(Nxyz)` etc.  In this case, `Nxyz` can
-           still be fully specified, indicating that the underlying W-SLDA code used a
-           certain number of plane-waves in the extra dimensions.
+            New in version 0.1.4, we allow `dim <= len(Nxyz)` etc.  In this case, `Nxyz` can
+            still be fully specified, indicating that the underlying W-SLDA code used a
+            certain number of plane-waves in the extra dimensions.
         xyz : (array_like,)*dim
-           Alternatively, the abscissa can be provided and the
-           previous properties will be computed (if defined).
+            Alternatively, the abscissa can be provided and the
+            previous properties will be computed (if defined).
         Nt, t0, dt : int, float, float
-           If these are provided, then the times are equally spaced.
-           ``t = np.arange(Nt)*dt + t0``.
+            If these are provided, then the times are equally spaced.
+            ``t = np.arange(Nt)*dt + t0``.
         t : array_like
-           Alternatively, the times can be provided and the previous
-           properties will be computed.
+            Alternatively, the times can be provided and the previous
+            properties will be computed.
 
         variables : [IVar]
-           List of Variables.
+            List of Variables.
 
         check_data : bool
-           If True, then upon initialization try to load all the data and check
-           that the dimensions are consistent.
-           (New in version 0.1.4)
+            If True, then upon initialization try to load all the data and check
+            that the dimensions are consistent.
+            (New in version 0.1.4)
         """
 
     def get_metadata(header=None):
@@ -227,8 +235,8 @@ class IWData(Interface):
         Arguments
         ---------
         header : str
-           Descriptive header to be added as a comment at the top of
-           the metadata file before self.description.
+            Descriptive header to be added as a comment at the top of
+            the metadata file before self.description.
         """
 
     def save(force=False):
@@ -237,38 +245,41 @@ class IWData(Interface):
         Arguments
         ---------
         force : bool
-           If True, create needed directories and overwrite existing
-           data files.  Otherwise, raise an IOError.
+            If True, create needed directories and overwrite existing
+            data files.  Otherwise, raise an IOError.
         """
 
-    def load(infofile=None, full_prefix=None):
+    def load(infofile=None, full_prefix=None, check_data=True):
         """Load data from disk.
 
         Arguments
         ---------
         infofile : str
-           If provided, then read this file and use the information
-           contained within it to load the data.
+            If provided, then read this file and use the information
+            contained within it to load the data.
         full_prefix : str
-           Full prefix for data files, including directory if not in
-           the current directory.  I.e. ``prefix='data_dir/run1'`` will
-           look for data in the form of ``'data_dir/run1_*.*'`` and an
-           infofile of the form ``'data_dir/run1.wtxt'``.
+            Full prefix for data files, including directory if not in
+            the current directory.  I.e. ``prefix='data_dir/run1'`` will
+            look for data in the form of ``'data_dir/run1_*.*'`` and an
+            infofile of the form ``'data_dir/run1.wtxt'``.
 
-           The full_prefix will be split at the final path
-           separation and what follows will be the ``prefix``.
-
+            The full_prefix will be split at the final path
+            separation and what follows will be the ``prefix``.
+        check_data : bool
+            If `True` (default), then check that the data exists and is consistent with
+            the description.  Can be set to `False` if data is missing.  One will then
+            have an error later if the data is accessed.
 
         **No infofile option**
 
         Data can be provided without metadata if the following files
         are present::
 
-           <full_prefix>_x.npy
-           <full_prefix>_y.npy
-           <full_prefix>_z.npy
-           <full_prefix>_t.npy
-           <full_prefix>_*.npy
+            <full_prefix>_x.npy
+            <full_prefix>_y.npy
+            <full_prefix>_z.npy
+            <full_prefix>_t.npy
+            <full_prefix>_*.npy
 
         In his case, the abscissa will be determined by loading the
         first four files, and the remaining files will defined the
@@ -751,11 +762,14 @@ class WData(object):
             variables.append(Var(_t=np.ravel(self.t)))
 
         for var in variables:
+            if var._data is None:
+                continue
             filename = os.path.join(data_dir, f"{self.prefix}_{var.name}.{self.ext}")
             var.write_data(filename=filename, force=force)
 
     @classmethod
-    def load(cls, infofile=None, full_prefix=None, **kw):
+    def load(cls, infofile=None, full_prefix=None, check_data=True, **kw):
+        kw.update(check_data=check_data)
         if infofile is not None:
             # Load from infofile
             if full_prefix is None:
@@ -847,7 +861,7 @@ class WData(object):
                 terms.pop(0)
                 name = terms.pop(0)
                 value = terms.pop(0)
-                unit = terms.pop(0) if terms else None
+                # unit = terms.pop(0) if terms else None
                 constants[name] = eval(value, constants)
             else:
                 # param  value
@@ -897,7 +911,7 @@ class WData(object):
                         + f"Using {files[0]}"
                     )
                 f = files[0]
-                ext = f.split(".")[-1]
+                # ext = f.split(".")[-1]
                 abscissa[_x] = Var(name=_x, shape=(None,), descr=float, filename=f).data
 
         xyz = tuple(abscissa.get(_x, None) for _x in _xyz)
@@ -987,19 +1001,25 @@ class WData(object):
         Arguments
         ---------
         var : IVar
-           Variable.
+            Variable.
         """
-        if len(var.data.shape) == 1:
+        if len(var.shape) == 1:
             return "abscissa"
         elif var.vector:
-            assert var.descr == "<f8"
+            assert var.descr == "<f8" 
             return "vector"
-        elif var.descr == "<c16":
+
+        descr = np.dtype(var.descr)
+        
+        if descr == "<c16":
             return "complex"
-        elif var.descr == "<f8":
+        elif descr == "<f8":
             return "real"
         else:
-            return var.descr
+            assert len(descr.descr) == 1
+            assert len(descr.descr[0]) == 2
+            assert descr.descr[0][0] == ""
+            return descr.descr[0][1]
 
     @staticmethod
     def _get_descr(type):

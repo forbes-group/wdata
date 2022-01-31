@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wdata"
-version = "0.1.6"
+version = "0.1.7"
 description = "W-Data format for superfluid dynamics and the W-SLDA Toolkit."
 authors = ["Michael McNeil Forbes <mforbes@alum.mit.edu>"]
 license = "MIT"
